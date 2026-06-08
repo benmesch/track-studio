@@ -11,6 +11,10 @@
   <div id="sidebar">
     <div id="sidebar-header">
       <h2>GPX Editor</h2>
+      <div class="unit-toggle">
+        <button class="unit-btn" data-unit="metric">m</button>
+        <button class="unit-btn" data-unit="imperial">ft</button>
+      </div>
       <button id="sidebar-close" title="Hide panel">&#10094;</button>
     </div>
 
@@ -61,6 +65,69 @@
         </div>
       </div>
 
+      <div class="collapsible spot-section">
+        <button class="section-toggle" id="spot-toggle" type="button" aria-expanded="true">
+          <span>Spot removal</span>
+          <span class="chevron">&#9662;</span>
+        </button>
+        <div class="section-content">
+          <div class="hint">Click the map to set the cursor, or scrub with the slider.</div>
+
+          <div class="control-group">
+            <label>Cursor position</label>
+            <div class="slider-row">
+              <input type="range" id="cursor-slider" min="0" max="0" value="0">
+              <input type="number" id="cursor-num" class="num-input" min="0" max="0" value="0">
+            </div>
+            <div class="btn-group">
+              <button class="btn-step" data-target="cursor" data-delta="-100">-100</button>
+              <button class="btn-step" data-target="cursor" data-delta="-10">-10</button>
+              <button class="btn-step" data-target="cursor" data-delta="-1">-1</button>
+              <button class="btn-step" data-target="cursor" data-delta="1">+1</button>
+              <button class="btn-step" data-target="cursor" data-delta="10">+10</button>
+              <button class="btn-step" data-target="cursor" data-delta="100">+100</button>
+            </div>
+          </div>
+
+          <div class="cursor-info">
+            <div class="info-cell">
+              <span class="info-key">Elev</span>
+              <span class="info-val" id="info-ele">&mdash;</span>
+            </div>
+            <div class="info-cell">
+              <span class="info-key">Time</span>
+              <span class="info-val" id="info-time">&mdash;</span>
+            </div>
+            <div class="info-cell">
+              <span class="info-key">&larr;</span>
+              <span class="info-val" id="info-prev">&mdash;</span>
+            </div>
+            <div class="info-cell">
+              <span class="info-key">&rarr;</span>
+              <span class="info-val" id="info-next">&mdash;</span>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button id="mark-btn" class="btn-action mark">Mark</button>
+            <button id="unmark-btn" class="btn-action unmark">Unmark</button>
+            <button id="clear-btn" class="btn-action clear">Clear all</button>
+          </div>
+
+          <div class="spot-stat" id="spot-count">Cursor at point 0</div>
+
+          <div class="collapsible marked-list-wrap collapsed">
+            <button class="section-toggle" id="marked-list-toggle" type="button" aria-expanded="false">
+              <span>Marked points (<span id="marked-count-inline">0</span>)</span>
+              <span class="chevron">&#9662;</span>
+            </button>
+            <div class="section-content">
+              <div class="marked-list" id="marked-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="keep-row">
         <span id="keep-count" class="keep-stat">Keeping all points</span>
       </div>
@@ -68,6 +135,7 @@
       <div class="legend">
         <span class="legend-item"><span class="dot blue"></span> Kept</span>
         <span class="legend-item"><span class="dot red"></span> Removed</span>
+        <span class="legend-item"><span class="dot yellow"></span> Cursor</span>
       </div>
     </div>
 

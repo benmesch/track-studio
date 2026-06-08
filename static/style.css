@@ -37,7 +37,30 @@ body { display: flex; overflow: hidden; }
 #sidebar-header {
   display: flex;
   align-items: center;
+  gap: 8px;
 }
+
+.unit-toggle {
+  display: flex;
+  background: #2a2a4a;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-left: auto;
+}
+.unit-btn {
+  background: none;
+  border: none;
+  color: #888;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.unit-btn.active { background: #2196F3; color: #fff; }
+.unit-btn:hover:not(.active) { color: #ccc; }
 
 #sidebar-header h2 {
   font-size: 1.1rem;
@@ -47,7 +70,6 @@ body { display: flex; overflow: hidden; }
 }
 
 #sidebar-close {
-  margin-left: auto;
   background: none;
   border: 1px solid #3a3a5a;
   color: #888;
@@ -235,8 +257,137 @@ input[type="range"] {
   border-radius: 50%;
   flex-shrink: 0;
 }
-.dot.blue { background: #2196F3; }
-.dot.red  { background: #e74c3c; }
+.dot.blue   { background: #2196F3; }
+.dot.red    { background: #e74c3c; }
+.dot.yellow { background: #FFEB3B; }
+
+/* ── Spot removal section ─────────────────── */
+.hint {
+  font-size: 0.78rem;
+  color: #777;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.action-row {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-action {
+  flex: 1;
+  border: 1px solid #3a3a5a;
+  background: #2a2a4a;
+  color: #ccc;
+  padding: 7px 0;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 500;
+  transition: background 0.12s, color 0.12s;
+}
+.btn-action.mark   { color: #ffb74d; }
+.btn-action.unmark { color: #81c784; }
+.btn-action.clear  { color: #f44336; }
+.btn-action:hover  { background: #3a3a6a; }
+.btn-action:active { background: #4a4a7a; }
+
+.spot-stat {
+  font-size: 0.85rem;
+  color: #888;
+}
+.spot-stat.has-marks { color: #ffb74d; }
+
+.cursor-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 14px;
+  padding: 8px 12px;
+  background: #14142a;
+  border: 1px solid #23234a;
+  border-radius: 6px;
+}
+.cursor-info .info-cell {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.cursor-info .info-key {
+  color: #888;
+  font-size: 0.78rem;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.cursor-info .info-val {
+  color: #ddd;
+  font-size: 0.84rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Marked points list ───────────────────── */
+.marked-list-wrap {
+  background: #14142a;
+  border: 1px solid #23234a;
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+.marked-list-wrap .section-content { margin-top: 8px; }
+
+.marked-list {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.marked-empty {
+  color: #666;
+  font-style: italic;
+  font-size: 0.82rem;
+  text-align: center;
+  padding: 8px 0;
+}
+
+.marked-row {
+  display: grid;
+  grid-template-columns: 56px 1fr 64px 22px;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 8px;
+  background: #2a2a4a;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: background 0.1s;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.marked-row:hover  { background: #3a3a6a; }
+.marked-row.current {
+  background: #3a3a1a;
+  outline: 1px solid #FFEB3B;
+}
+
+.marked-idx  { color: #888; font-size: 0.78rem; }
+.marked-time { color: #ccc; }
+.marked-ele  { color: #aaa; text-align: right; font-size: 0.8rem; }
+
+.marked-unmark {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  border-radius: 3px;
+}
+.marked-unmark:hover { color: #f44336; background: #2a1a1a; }
 
 /* ── Step buttons (+1 / +5 / +10) ───────────── */
 .btn-group {

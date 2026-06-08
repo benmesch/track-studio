@@ -1,11 +1,14 @@
 'use strict';
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let allPoints = [];   // [{lat, lon}, ...]
+let allPoints = [];           // [{lat, lon, time}, ...]
 let currentDoc = null;
 let currentFilename = '';
 let trimStart = 0;
 let trimEnd = 0;
+let removedSet = new Set();   // indices marked for spot removal
+let cursorIdx = 0;
+let units = localStorage.getItem('gpx-units') || 'metric';  // 'metric' | 'imperial'
 
 // ── Map setup ─────────────────────────────────────────────────────────────────
 const map = L.map('map', { zoomControl: true }).setView([20, 0], 2);
@@ -15,8 +18,16 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,
 }).addTo(map);
 
-// Three polylines: removed start, kept, removed end
-const layers = { removedStart: null, kept: null, removedEnd: null };
+// Dynamic list of layers added to the map (cleared on each render)
+let mapLayers = [];
+function clearLayers() {
+  mapLayers.forEach(l => map.removeLayer(l));
+  mapLayers = [];
+}
+function addLayer(layer) {
+  layer.addTo(map);
+  mapLayers.push(layer);
+}
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const fileInput       = document.getElementById('file-input');
@@ -35,6 +46,20 @@ const sidebarOpen     = document.getElementById('sidebar-open');
 const backdrop        = document.getElementById('backdrop');
 const fileSection     = document.querySelector('.file-section');
 const fileToggle      = document.getElementById('file-toggle');
+const cursorSlider    = document.getElementById('cursor-slider');
+const cursorNum       = document.getElementById('cursor-num');
+const sidebarEl       = document.getElementById('sidebar');
+const markBtn         = document.getElementById('mark-btn');
+const unmarkBtn       = document.getElementById('unmark-btn');
+const clearBtn        = document.getElementById('clear-btn');
+const spotCountEl     = document.getElementById('spot-count');
+const infoEleEl       = document.getElementById('info-ele');
+const infoTimeEl      = document.getElementById('info-time');
+const infoPrevEl      = document.getElementById('info-prev');
+const infoNextEl      = document.getElementById('info-next');
+const markedListWrap  = document.querySelector('.marked-list-wrap');
+const markedListEl    = document.getElementById('marked-list');
+const markedCountInlineEl = document.getElementById('marked-count-inline');
 
 // ── Generic collapsible sections ──────────────────────────────────────────────
 document.querySelectorAll('.section-toggle').forEach(btn => {
@@ -66,6 +91,23 @@ backdrop.addEventListener('click', closeSidebar);
 // Start collapsed on mobile
 if (window.innerWidth <= 640) closeSidebar();
 
+// ── Unit toggle (metric / imperial) ───────────────────────────────────────────
+function setUnits(u) {
+  units = u === 'imperial' ? 'imperial' : 'metric';
+  localStorage.setItem('gpx-units', units);
+  document.querySelectorAll('.unit-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.unit === units);
+  });
+  if (allPoints.length > 0) {
+    updateDisplay();
+    renderMarkedList();
+  }
+}
+document.querySelectorAll('.unit-btn').forEach(btn => {
+  btn.addEventListener('click', () => setUnits(btn.dataset.unit));
+});
+setUnits(units);
+
 // ── GPX parsing ───────────────────────────────────────────────────────────────
 function loadGpxText(text, filename) {
   const parser = new DOMParser();
@@ -85,11 +127,14 @@ function loadGpxText(text, filename) {
 
   allPoints = trkpts.map(pt => {
     const timeEl = pt.getElementsByTagName('time')[0];
+    const eleEl  = pt.getElementsByTagName('ele')[0];
     const t = timeEl ? Date.parse(timeEl.textContent) : NaN;
+    const e = eleEl ? parseFloat(eleEl.textContent) : NaN;
     return {
       lat: parseFloat(pt.getAttribute('lat')),
       lon: parseFloat(pt.getAttribute('lon')),
       time: isNaN(t) ? null : t,
+      ele:  isNaN(e) ? null : e,
     };
   });
 
@@ -98,6 +143,8 @@ function loadGpxText(text, filename) {
 
   trimStart = 0;
   trimEnd = 0;
+  removedSet = new Set();
+  cursorIdx = 0;
   resetControls();
   controls.hidden = false;
   downloadBtn.hidden = false;
@@ -112,8 +159,8 @@ function loadGpxText(text, filename) {
 
 // ── Controls ──────────────────────────────────────────────────────────────────
 function resetControls() {
-  const max = allPoints.length - 1;
-  for (const el of [startSlider, startNum, endSlider, endNum]) {
+  const max = Math.max(0, allPoints.length - 1);
+  for (const el of [startSlider, startNum, endSlider, endNum, cursorSlider, cursorNum]) {
     el.max = max;
     el.value = 0;
   }
@@ -137,8 +184,54 @@ function setTrimEnd(val) {
   updateMap();
 }
 
+// Pixel-rect of the map area not covered by the mobile bottom panel.
+function visibleMapRect() {
+  const c = map.getContainer();
+  const isMobile = window.innerWidth <= 640;
+  const panelOpen = !document.body.classList.contains('sidebar-hidden');
+  const bottomCovered = (isMobile && panelOpen) ? sidebarEl.offsetHeight : 0;
+  return { w: c.clientWidth, h: c.clientHeight, bottomCovered };
+}
+
+function isLatLngVisible(latLng) {
+  const { w, h, bottomCovered } = visibleMapRect();
+  const pt = map.latLngToContainerPoint(latLng);
+  const m = 32; // edge padding
+  return pt.x > m && pt.x < w - m && pt.y > m && pt.y < h - bottomCovered - m;
+}
+
+// panTo, but offsets the target downward so it ends up centered in the
+// area NOT covered by the bottom panel.
+function panToVisible(latLng) {
+  const { bottomCovered } = visibleMapRect();
+  if (bottomCovered === 0) { map.panTo(latLng); return; }
+  const targetPt = map.project(latLng);
+  map.panTo(map.unproject(targetPt.add([0, bottomCovered / 2])));
+}
+
+function setCursor(val, { pan = false } = {}) {
+  const max = Math.max(0, allPoints.length - 1);
+  cursorIdx = Math.max(0, Math.min(parseInt(val, 10) || 0, max));
+  cursorSlider.value = cursorIdx;
+  cursorNum.value = cursorIdx;
+  if (pan && allPoints[cursorIdx]) {
+    const p = allPoints[cursorIdx];
+    const ll = L.latLng(p.lat, p.lon);
+    if (!isLatLngVisible(ll)) panToVisible(ll);
+  }
+  updateDisplay();
+  updateMap();
+}
+
+function isRemoved(idx) {
+  const total = allPoints.length;
+  if (idx < trimStart) return true;
+  if (idx >= total - trimEnd) return true;
+  return removedSet.has(idx);
+}
+
 function formatDuration(ms) {
-  if (!ms || ms < 0) return '';
+  if (ms == null || isNaN(ms) || ms < 0) return '';
   const totalSec = Math.round(ms / 1000);
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
@@ -147,6 +240,104 @@ function formatDuration(ms) {
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
 }
+
+// Great-circle distance in meters between two GPS points
+function haversineMeters(p1, p2) {
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const lat1 = toRad(p1.lat), lat2 = toRad(p2.lat);
+  const dLat = toRad(p2.lat - p1.lat);
+  const dLon = toRad(p2.lon - p1.lon);
+  const a = Math.sin(dLat / 2) ** 2
+          + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+const M_TO_FT = 3.28084;
+const M_TO_MI = 0.000621371;
+
+function formatDistance(m) {
+  if (m == null || isNaN(m)) return '—';
+  if (units === 'imperial') {
+    const ft = m * M_TO_FT;
+    if (ft < 5280) return `${ft.toFixed(0)} ft`;
+    return `${(m * M_TO_MI).toFixed(2)} mi`;
+  }
+  if (m < 1000) return `${m.toFixed(1)} m`;
+  return `${(m / 1000).toFixed(2)} km`;
+}
+
+function formatElevation(m) {
+  if (m == null || isNaN(m)) return '—';
+  if (units === 'imperial') return `${(m * M_TO_FT).toFixed(0)} ft`;
+  return `${m.toFixed(1)} m`;
+}
+
+function formatNeighbor(here, other) {
+  if (!other) return '—';
+  const dist = formatDistance(haversineMeters(here, other));
+  const dt = (here.time != null && other.time != null)
+    ? formatDuration(Math.abs(other.time - here.time))
+    : '';
+  return dt ? `${dist} · ${dt}` : dist;
+}
+
+function formatRelativeTime(deltaMs) {
+  if (deltaMs == null || isNaN(deltaMs)) return '—';
+  if (deltaMs === 0) return '0s';
+  if (deltaMs < 0) {
+    const s = formatDuration(-deltaMs);
+    return s ? `−${s}` : '0s';
+  }
+  return formatDuration(deltaMs) || '0s';
+}
+
+function renderMarkedList() {
+  const count = removedSet.size;
+  markedCountInlineEl.textContent = count;
+
+  if (count === 0) {
+    markedListEl.innerHTML = '<div class="marked-empty">No points marked yet.</div>';
+    return;
+  }
+
+  const startTime = allPoints[trimStart] ? allPoints[trimStart].time : null;
+  const sorted = [...removedSet].sort((a, b) => a - b);
+
+  const html = sorted.map(idx => {
+    const p = allPoints[idx];
+    if (!p) return '';
+    const rel = (startTime != null && p.time != null) ? p.time - startTime : null;
+    const timeStr = formatRelativeTime(rel);
+    const eleStr  = formatElevation(p.ele);
+    const cur = idx === cursorIdx ? ' current' : '';
+    return `<div class="marked-row${cur}" data-idx="${idx}">`
+         +   `<span class="marked-idx">#${idx.toLocaleString()}</span>`
+         +   `<span class="marked-time">${timeStr}</span>`
+         +   `<span class="marked-ele">${eleStr}</span>`
+         +   `<button class="marked-unmark" data-unmark-idx="${idx}" title="Unmark">&times;</button>`
+         + `</div>`;
+  }).join('');
+
+  markedListEl.innerHTML = html;
+}
+
+markedListEl.addEventListener('click', e => {
+  const x = e.target.closest('.marked-unmark');
+  if (x) {
+    e.stopPropagation();
+    const idx = parseInt(x.dataset.unmarkIdx, 10);
+    removedSet.delete(idx);
+    updateDisplay();
+    updateMap();
+    return;
+  }
+  const row = e.target.closest('.marked-row');
+  if (row) {
+    const idx = parseInt(row.dataset.idx, 10);
+    setCursor(idx, { pan: true });
+  }
+});
 
 function timeBetween(i, j) {
   if (i < 0 || j >= allPoints.length || i >= j) return null;
@@ -157,16 +348,47 @@ function timeBetween(i, j) {
 
 function updateDisplay() {
   const total = allPoints.length;
-  const kept = total - trimStart - trimEnd;
+
+  // Count removed via union of trim ranges + removedSet
+  let removed = trimStart + trimEnd;
+  removedSet.forEach(idx => {
+    if (idx >= trimStart && idx < total - trimEnd) removed++;
+  });
+  const kept = Math.max(0, total - removed);
+
   totalCountEl.textContent = `${total.toLocaleString()} points total`;
 
-  if (trimStart === 0 && trimEnd === 0) {
+  if (removed === 0) {
     keepCountEl.textContent = 'Keeping all points';
     keepCountEl.classList.remove('trimming');
   } else {
-    const removed = trimStart + trimEnd;
     keepCountEl.textContent = `Keeping ${kept.toLocaleString()} of ${total.toLocaleString()} (−${removed})`;
     keepCountEl.classList.add('trimming');
+  }
+
+  // Cursor stat
+  spotCountEl.textContent = total > 0
+    ? `Cursor at point ${cursorIdx.toLocaleString()} of ${total.toLocaleString()}`
+    : 'No track loaded';
+  spotCountEl.classList.toggle('has-marks', removedSet.size > 0);
+
+  // Marked-points list (sub-collapsible)
+  renderMarkedList();
+
+  // Cursor info: elevation, relative time, neighbor distance/time
+  const here = allPoints[cursorIdx];
+  if (here) {
+    const startTime = allPoints[trimStart] ? allPoints[trimStart].time : null;
+    const relTime = (startTime != null && here.time != null) ? here.time - startTime : null;
+    infoEleEl.textContent  = formatElevation(here.ele);
+    infoTimeEl.textContent = formatRelativeTime(relTime);
+    infoPrevEl.textContent = cursorIdx > 0
+      ? formatNeighbor(here, allPoints[cursorIdx - 1]) : '—';
+    infoNextEl.textContent = cursorIdx < total - 1
+      ? formatNeighbor(here, allPoints[cursorIdx + 1]) : '—';
+  } else {
+    infoEleEl.textContent = infoTimeEl.textContent =
+      infoPrevEl.textContent = infoNextEl.textContent = '—';
   }
 
   // Time removed labels (only if GPX has timestamps)
@@ -187,34 +409,77 @@ function updateDisplay() {
 
 // ── Map rendering ─────────────────────────────────────────────────────────────
 function updateMap() {
-  for (const key of Object.keys(layers)) {
-    if (layers[key]) { map.removeLayer(layers[key]); layers[key] = null; }
-  }
-
+  clearLayers();
   const total = allPoints.length;
-  const endIdx = trimEnd > 0 ? total - trimEnd : total;
+  if (total === 0) return;
   const toLL = p => [p.lat, p.lon];
 
-  const removedStartPts = allPoints.slice(0, trimStart);
-  const keptPts         = allPoints.slice(trimStart, endIdx);
-  const removedEndPts   = allPoints.slice(endIdx);
+  // 1) Red segments — consecutive runs of removed points
+  let segStart = -1;
+  for (let i = 0; i <= total; i++) {
+    const removed = i < total && isRemoved(i);
+    if (removed && segStart < 0) segStart = i;
+    if (!removed && segStart >= 0) {
+      const pts = allPoints.slice(segStart, i);
+      if (pts.length >= 2) {
+        addLayer(L.polyline(pts.map(toLL), {
+          color: '#e74c3c', weight: 5, opacity: 0.85,
+          interactive: false,
+        }));
+      }
+      segStart = -1;
+    }
+  }
 
-  if (removedStartPts.length >= 2) {
-    layers.removedStart = L.polyline(removedStartPts.map(toLL), {
-      color: '#e74c3c', weight: 4, opacity: 0.85,
-    }).addTo(map);
+  // 2) Blue line — kept points only (the resulting cleaned track)
+  const keptPts = [];
+  for (let i = 0; i < total; i++) {
+    if (!isRemoved(i)) keptPts.push(allPoints[i]);
   }
   if (keptPts.length >= 2) {
-    layers.kept = L.polyline(keptPts.map(toLL), {
-      color: '#2196F3', weight: 4, opacity: 0.9,
-    }).addTo(map);
+    addLayer(L.polyline(keptPts.map(toLL), {
+      color: '#2196F3', weight: 4, opacity: 0.95,
+      interactive: false,
+    }));
   }
-  if (removedEndPts.length >= 2) {
-    layers.removedEnd = L.polyline(removedEndPts.map(toLL), {
-      color: '#e74c3c', weight: 4, opacity: 0.85,
-    }).addTo(map);
+
+  // 3) Red dots — individually-marked points (only those NOT in trim ranges)
+  removedSet.forEach(idx => {
+    if (idx < trimStart || idx >= total - trimEnd) return;
+    const p = allPoints[idx];
+    if (!p) return;
+    addLayer(L.circleMarker(toLL(p), {
+      radius: 4, color: '#fff', fillColor: '#e74c3c',
+      fillOpacity: 1, weight: 1.5, interactive: false,
+    }));
+  });
+
+  // 4) Cursor marker — bright yellow dot at the current cursor point
+  const cp = allPoints[cursorIdx];
+  if (cp) {
+    addLayer(L.circleMarker(toLL(cp), {
+      radius: 7, color: '#000', fillColor: '#FFEB3B',
+      fillOpacity: 1, weight: 2, interactive: false,
+    }));
   }
 }
+
+// ── Nearest-point lookup (for map click) ─────────────────────────────────────
+function nearestPointIndex(lat, lng) {
+  let best = 0, bestD = Infinity;
+  for (let i = 0; i < allPoints.length; i++) {
+    const dLat = allPoints[i].lat - lat;
+    const dLon = allPoints[i].lon - lng;
+    const d = dLat * dLat + dLon * dLon;
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
+map.on('click', e => {
+  if (allPoints.length === 0) return;
+  setCursor(nearestPointIndex(e.latlng.lat, e.latlng.lng));
+});
 
 // ── Download (fully client-side) ──────────────────────────────────────────────
 downloadBtn.addEventListener('click', () => {
@@ -223,15 +488,18 @@ downloadBtn.addEventListener('click', () => {
   const doc = currentDoc.cloneNode(true);
   const trkpts = Array.from(doc.querySelectorAll('trkpt'));
   const total = trkpts.length;
-  const endIdx = trimEnd > 0 ? total - trimEnd : total;
 
-  // Remove end first so start indices stay valid
-  for (let i = total - 1; i >= endIdx; i--) {
-    trkpts[i].parentNode.removeChild(trkpts[i]);
-  }
-  for (let i = trimStart - 1; i >= 0; i--) {
-    trkpts[i].parentNode.removeChild(trkpts[i]);
-  }
+  // Build the set of indices to remove (start + end + spot-marked), then drop
+  // them in descending order so earlier indices stay valid.
+  const toRemove = new Set();
+  for (let i = 0; i < trimStart; i++) toRemove.add(i);
+  for (let i = total - trimEnd; i < total; i++) toRemove.add(i);
+  removedSet.forEach(idx => toRemove.add(idx));
+
+  [...toRemove].sort((a, b) => b - a).forEach(idx => {
+    const pt = trkpts[idx];
+    if (pt && pt.parentNode) pt.parentNode.removeChild(pt);
+  });
 
   const xmlStr = new XMLSerializer().serializeToString(doc);
   const blob = new Blob([xmlStr], { type: 'application/gpx+xml' });
@@ -253,17 +521,42 @@ fileInput.addEventListener('change', e => {
   readFile(file);
 });
 
-startSlider.addEventListener('input', e => setTrimStart(e.target.value));
-startNum.addEventListener('input',   e => setTrimStart(e.target.value));
-endSlider.addEventListener('input',  e => setTrimEnd(e.target.value));
-endNum.addEventListener('input',     e => setTrimEnd(e.target.value));
+startSlider.addEventListener('input',  e => setTrimStart(e.target.value));
+startNum.addEventListener('input',     e => setTrimStart(e.target.value));
+endSlider.addEventListener('input',    e => setTrimEnd(e.target.value));
+endNum.addEventListener('input',       e => setTrimEnd(e.target.value));
+cursorSlider.addEventListener('input', e => setCursor(e.target.value, { pan: true }));
+cursorNum.addEventListener('input',    e => setCursor(e.target.value, { pan: true }));
+
+markBtn.addEventListener('click', () => {
+  if (!allPoints.length) return;
+  removedSet.add(cursorIdx);
+  updateDisplay();
+  updateMap();
+});
+
+unmarkBtn.addEventListener('click', () => {
+  if (!allPoints.length) return;
+  removedSet.delete(cursorIdx);
+  updateDisplay();
+  updateMap();
+});
+
+clearBtn.addEventListener('click', () => {
+  if (removedSet.size === 0) return;
+  removedSet.clear();
+  updateDisplay();
+  updateMap();
+});
 
 document.addEventListener('click', e => {
   const btn = e.target.closest('.btn-step');
   if (!btn || !allPoints.length) return;
   const delta = parseInt(btn.dataset.delta, 10);
-  if (btn.dataset.target === 'start') setTrimStart(trimStart + delta);
-  else                                setTrimEnd(trimEnd + delta);
+  const tgt = btn.dataset.target;
+  if      (tgt === 'start')  setTrimStart(trimStart + delta);
+  else if (tgt === 'end')    setTrimEnd(trimEnd + delta);
+  else if (tgt === 'cursor') setCursor(cursorIdx + delta, { pan: true });
 });
 
 // ── Drag-and-drop ─────────────────────────────────────────────────────────────
