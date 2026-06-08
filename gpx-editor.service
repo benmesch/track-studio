@@ -1,0 +1,15 @@
+[Unit]
+Description=GPX Editor Web App
+After=network.target
+
+[Service]
+Type=simple
+User=benmesch
+WorkingDirectory=/home/benmesch/claude_try/gpx-editor
+ExecStart=/usr/bin/python3 /home/benmesch/claude_try/gpx-editor/app.py
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

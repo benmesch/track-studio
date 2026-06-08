@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPX Editor</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <h2>GPX Editor</h2>
+      <button id="sidebar-close" title="Hide panel">&#10094;</button>
+    </div>
+
+    <div class="section" id="controls" hidden>
+      <div class="stat-row">
+        <span id="total-count" class="stat">— points total</span>
+      </div>
+
+      <div class="collapsible trim-section">
+        <button class="section-toggle" id="trim-toggle" type="button" aria-expanded="true">
+          <span>Trim</span>
+          <span class="chevron">&#9662;</span>
+        </button>
+        <div class="section-content">
+          <div class="control-group">
+            <label>Remove from start</label>
+            <div class="slider-row">
+              <input type="range" id="trim-start-slider" min="0" max="0" value="0">
+              <input type="number" id="trim-start-num" class="num-input" min="0" max="0" value="0">
+            </div>
+            <div class="btn-group">
+              <button class="btn-step" data-target="start" data-delta="-10">-10</button>
+              <button class="btn-step" data-target="start" data-delta="-5">-5</button>
+              <button class="btn-step" data-target="start" data-delta="-1">-1</button>
+              <button class="btn-step" data-target="start" data-delta="1">+1</button>
+              <button class="btn-step" data-target="start" data-delta="5">+5</button>
+              <button class="btn-step" data-target="start" data-delta="10">+10</button>
+            </div>
+            <div class="time-removed" id="time-removed-start"></div>
+          </div>
+
+          <div class="control-group">
+            <label>Remove from end</label>
+            <div class="slider-row">
+              <input type="range" id="trim-end-slider" min="0" max="0" value="0">
+              <input type="number" id="trim-end-num" class="num-input" min="0" max="0" value="0">
+            </div>
+            <div class="btn-group">
+              <button class="btn-step" data-target="end" data-delta="-10">-10</button>
+              <button class="btn-step" data-target="end" data-delta="-5">-5</button>
+              <button class="btn-step" data-target="end" data-delta="-1">-1</button>
+              <button class="btn-step" data-target="end" data-delta="1">+1</button>
+              <button class="btn-step" data-target="end" data-delta="5">+5</button>
+              <button class="btn-step" data-target="end" data-delta="10">+10</button>
+            </div>
+            <div class="time-removed" id="time-removed-end"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="keep-row">
+        <span id="keep-count" class="keep-stat">Keeping all points</span>
+      </div>
+
+      <div class="legend">
+        <span class="legend-item"><span class="dot blue"></span> Kept</span>
+        <span class="legend-item"><span class="dot red"></span> Removed</span>
+      </div>
+    </div>
+
+    <div class="section file-section collapsible">
+      <button class="section-toggle" id="file-toggle" type="button" aria-expanded="true">
+        <span>File</span>
+        <span class="chevron">&#9662;</span>
+      </button>
+      <div class="section-content">
+        <label for="file-input">Load GPX file</label>
+        <input type="file" id="file-input" accept=".gpx">
+        <button id="download-btn" class="btn-primary" hidden>Download Trimmed GPX</button>
+      </div>
+    </div>
+
+    <div id="drop-hint">
+      <p>Drop a .gpx file anywhere<br>or use the picker above</p>
+    </div>
+  </div>
+
+  <div id="backdrop"></div>
+  <button id="sidebar-open" title="Show controls">&#9776; Controls</button>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
