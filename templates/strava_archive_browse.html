@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Browse Activities &mdash; Track Studio</title>
+  <link rel="stylesheet" href="/static/home.css">
+  <link rel="stylesheet" href="/static/strava_archive_browse.css">
+</head>
+<body>
+  <main class="page page--wide">
+    <div class="topbar">
+      <a href="/" class="back-link">&#8249; Track Studio</a>
+      <div class="topbar-actions">
+        <a href="/strava_archive" class="upload-link" title="Upload a new Strava archive">↑ Upload archive</a>
+        <div class="unit-toggle" id="unit-toggle" role="group" aria-label="Units">
+          <button data-unit="mi" class="active">mi / ft</button>
+          <button data-unit="km">km / m</button>
+        </div>
+      </div>
+    </div>
+
+    <header class="hero hero--compact">
+      <h1>Activities</h1>
+      <p class="tagline" id="result-summary">Loading&hellip;</p>
+    </header>
+
+    <section id="empty-state" class="empty-state" hidden>
+      <h2>No activities yet</h2>
+      <p>Upload your Strava archive to start browsing your activity history.</p>
+      <a href="/strava_archive" class="primary-btn">Upload archive</a>
+    </section>
+
+    <div class="results-bar">
+      <label class="sort-cluster">
+        <span class="sort-label">Sort by</span>
+        <select id="sort" class="sort-select">
+          <option value="date_desc">Newest first</option>
+          <option value="date_asc">Oldest first</option>
+          <option value="distance_desc">Longest distance</option>
+          <option value="distance_asc">Shortest distance</option>
+          <option value="time_desc">Longest duration</option>
+          <option value="time_asc">Shortest duration</option>
+          <option value="elevation_desc">Most elevation</option>
+          <option value="name_asc">Name (A&ndash;Z)</option>
+        </select>
+      </label>
+      <button id="toggle-filters" class="filters-toggle" type="button" aria-expanded="false">
+        <span>Filters</span>
+        <span id="filter-badge" class="filter-badge" hidden>0</span>
+        <span class="filter-chevron" aria-hidden="true">▾</span>
+      </button>
+    </div>
+
+    <div id="filter-panel" class="filter-panel" hidden>
+      <nav class="type-tabs" id="type-tabs"></nav>
+
+      <section class="filters">
+        <div class="filter-row">
+          <input type="search" id="q" class="search-input" placeholder="Search name or description&hellip;" autocomplete="off">
+          <button id="clear-filters" class="ghost-btn" type="button">Clear filters</button>
+        </div>
+
+        <div class="slider-grid">
+        <div class="slider-cell" data-key="distance">
+          <div class="slider-label">
+            <span>Distance</span>
+            <span class="slider-value" id="distance-val">&mdash;</span>
+          </div>
+          <div class="range-slider">
+            <div class="range-track"></div>
+            <div class="range-fill" id="distance-fill"></div>
+            <input type="range" id="distance-min" min="0" max="1000" value="0" step="1">
+            <input type="range" id="distance-max" min="0" max="1000" value="1000" step="1">
+          </div>
+        </div>
+
+        <div class="slider-cell" data-key="time">
+          <div class="slider-label">
+            <span>Moving time</span>
+            <span class="slider-value" id="time-val">&mdash;</span>
+          </div>
+          <div class="range-slider">
+            <div class="range-track"></div>
+            <div class="range-fill" id="time-fill"></div>
+            <input type="range" id="time-min" min="0" max="1000" value="0" step="1">
+            <input type="range" id="time-max" min="0" max="1000" value="1000" step="1">
+          </div>
+        </div>
+
+        <div class="slider-cell" data-key="elevation">
+          <div class="slider-label">
+            <span>Elevation gain</span>
+            <span class="slider-value" id="elevation-val">&mdash;</span>
+          </div>
+          <div class="range-slider">
+            <div class="range-track"></div>
+            <div class="range-fill" id="elevation-fill"></div>
+            <input type="range" id="elevation-min" min="0" max="1000" value="0" step="1">
+            <input type="range" id="elevation-max" min="0" max="1000" value="1000" step="1">
+          </div>
+        </div>
+
+        <div class="slider-cell" data-key="hour">
+          <div class="slider-label">
+            <span>Time of day (start)</span>
+            <span class="slider-value" id="hour-val">&mdash;</span>
+          </div>
+          <div class="range-slider">
+            <div class="range-track"></div>
+            <div class="range-fill" id="hour-fill"></div>
+            <input type="range" id="hour-min" min="0" max="23" value="0" step="1">
+            <input type="range" id="hour-max" min="0" max="23" value="23" step="1">
+          </div>
+        </div>
+
+        <div class="slider-cell slider-cell--dates" data-key="dates">
+          <div class="slider-label"><span>Date range</span></div>
+          <div class="date-row">
+            <input type="date" id="start-date" class="date-input">
+            <span class="date-sep">to</span>
+            <input type="date" id="end-date" class="date-input">
+          </div>
+        </div>
+      </div>
+
+      <div class="extra-filters">
+        <div class="extra-block" id="location-block" hidden>
+          <button type="button" class="extra-block-toggle" data-target="location-pills" aria-expanded="false">
+            <span class="extra-label">Location</span>
+            <span class="extra-selected-count" id="location-selected-count" hidden>0</span>
+            <span class="filter-chevron" aria-hidden="true">▾</span>
+          </button>
+          <div class="gear-pills extra-block-body" id="location-pills" hidden></div>
+        </div>
+        <div class="extra-block" id="gear-block" hidden>
+          <button type="button" class="extra-block-toggle" data-target="gear-pills" aria-expanded="false">
+            <span class="extra-label">Gear</span>
+            <span class="extra-selected-count" id="gear-selected-count" hidden>0</span>
+            <span class="filter-chevron" aria-hidden="true">▾</span>
+          </button>
+          <div class="gear-pills extra-block-body" id="gear-pills" hidden></div>
+        </div>
+        <div class="extra-block">
+          <label class="check-pill">
+            <input type="checkbox" id="has-hr-input">
+            <span class="check-label">Has HR data</span>
+            <span class="check-count" id="has-hr-count"></span>
+          </label>
+          <label class="check-pill">
+            <input type="checkbox" id="has-elev-input">
+            <span class="check-label">Has elevation data</span>
+            <span class="check-count" id="has-elev-count"></span>
+          </label>
+        </div>
+      </div>
+      </section>
+    </div>
+
+    <section class="results">
+      <div class="results-header">
+        <span>Date</span>
+        <span>Activity</span>
+        <span>Distance</span>
+        <span>Time</span>
+        <span>Elev</span>
+      </div>
+      <ul id="results-list" class="results-list"></ul>
+      <div class="results-footer">
+        <button id="load-more" class="load-more-btn" type="button" hidden>Load more</button>
+        <p id="results-empty" class="results-empty" hidden>No activities match these filters.</p>
+      </div>
+    </section>
+  </main>
+  <script src="/static/strava_archive_browse.js"></script>
+</body>
+</html>

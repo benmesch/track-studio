@@ -1,0 +1,362 @@
+.page--wide { max-width: 1100px; }
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.topbar .back-link { margin-bottom: 0; }
+
+.unit-toggle {
+  display: inline-flex;
+  border: 1px solid #2a2a4a;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #14142a;
+}
+.unit-toggle button {
+  padding: 5px 12px;
+  border: none;
+  background: transparent;
+  color: #888;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.unit-toggle button.active {
+  background: #2196F3;
+  color: #fff;
+}
+
+.loading, .not-found {
+  text-align: center;
+  color: #888;
+  padding: 40px;
+  font-size: 0.95rem;
+}
+.not-found { color: #e57373; }
+
+.activity-card {
+  background: #14142a;
+  border: 1px solid #23234a;
+  border-radius: 10px;
+  padding: 24px 26px;
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.activity-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.activity-title .type-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+.activity-title h1 {
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 4px;
+  line-height: 1.2;
+}
+.meta-line {
+  color: #888;
+  font-size: 0.88rem;
+  margin: 0;
+}
+.meta-sep { margin: 0 6px; color: #555; }
+
+.location-line {
+  color: #6cb6ff;
+  font-size: 0.85rem;
+  margin: 4px 0 0;
+  font-weight: 500;
+}
+
+.activity-description {
+  color: #bbb;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin: 0 0 18px;
+  padding: 10px 14px;
+  background: #0e0e1e;
+  border-left: 3px solid #2196F3;
+  border-radius: 4px;
+  white-space: pre-wrap;
+}
+
+/* ── Stat grid ──────────────────────────────────────────── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 1px;
+  background: #23234a;
+  border: 1px solid #23234a;
+  border-radius: 8px;
+  margin-bottom: 22px;
+  overflow: hidden;
+}
+.stat {
+  background: #14142a;
+  padding: 14px 16px;
+  text-align: left;
+}
+.stat-label {
+  color: #888;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+.stat-value {
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.stat-sub {
+  color: #888;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+/* ── Section heads ──────────────────────────────────────── */
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.section-head h2 {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+.section-sub {
+  color: #888;
+  font-size: 0.82rem;
+}
+
+.series-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+}
+.series-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #aaa;
+  font-size: 0.82rem;
+  cursor: pointer;
+  user-select: none;
+}
+/* The display: inline-flex above silently overrides the hidden attribute —
+   restore the expected behavior so toggles for missing series stay hidden. */
+.series-toggle[hidden] { display: none; }
+.series-toggle:hover { color: #ddd; }
+.series-toggle input[type="checkbox"] {
+  margin: 0;
+  accent-color: #2196F3;
+  cursor: pointer;
+}
+.series-dot {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  display: inline-block;
+}
+.series-dot-elev { background: #2196F3; }
+.series-dot-hr   { background: #e53935; }
+.series-dot-pwr  { background: #FFB300; }
+.series-dot-cad  { background: #4caf50; }
+
+/* ── Map ────────────────────────────────────────────────── */
+.map-section { margin-bottom: 22px; }
+#map {
+  width: 100%;
+  height: 460px;
+  border-radius: 8px;
+  border: 1px solid #23234a;
+  background: #0e0e1e;
+}
+@media (max-width: 700px) {
+  #map { height: 320px; }
+}
+
+/* Override Leaflet default attribution box style for dark theme */
+.leaflet-control-attribution {
+  background: rgba(20, 20, 42, 0.85) !important;
+  color: #aaa !important;
+}
+.leaflet-control-attribution a { color: #2196F3 !important; }
+
+/* Start/end markers */
+.endpoint-marker {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+.endpoint-marker.start { background: #4caf50; }
+.endpoint-marker.end   { background: #e53935; }
+
+.cursor-marker {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #FFEB3B;
+  border: 2px solid #000;
+  box-shadow: 0 0 0 1px #FFEB3B, 0 1px 4px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+
+/* ── Cursor scrubber + stats ────────────────────────────── */
+.cursor-section {
+  margin-bottom: 22px;
+}
+.cursor-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.cursor-play {
+  width: 34px;
+  height: 34px;
+  background: #2196F3;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding-left: 2px;
+  transition: background 0.1s;
+}
+.cursor-play:hover { background: #1976D2; }
+.cursor-play.playing { background: #e53935; padding-left: 0; }
+
+.cursor-scrubber {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: linear-gradient(to right, #2196F3 var(--pct, 0%), #2a2a4a var(--pct, 0%));
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+.cursor-scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #FFEB3B;
+  border: 2px solid #14142a;
+  cursor: pointer;
+}
+.cursor-scrubber::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #FFEB3B;
+  border: 2px solid #14142a;
+  cursor: pointer;
+}
+
+.cursor-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  background: #0e0e1e;
+  border: 1px solid #23234a;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #ccc;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+.cursor-stat .stat-label {
+  display: inline;
+  color: #777;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  margin-right: 4px;
+  text-transform: uppercase;
+}
+.cursor-stat .stat-val { color: #fff; font-weight: 500; }
+.chart-wrap { cursor: crosshair; }
+
+/* ── Elevation chart ────────────────────────────────────── */
+.elevation-section { margin-bottom: 22px; }
+.chart-wrap {
+  background: #0e0e1e;
+  border: 1px solid #23234a;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+#elev-chart {
+  width: 100%;
+  height: 180px;
+  display: block;
+}
+.chart-axis-x {
+  display: flex;
+  justify-content: space-between;
+  color: #777;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  margin-top: 4px;
+}
+
+/* ── No-track + raw section ────────────────────────────── */
+.no-track {
+  background: #0e0e1e;
+  border: 1px dashed #2a2a4a;
+  border-radius: 8px;
+  padding: 28px;
+  text-align: center;
+  color: #888;
+  font-size: 0.95rem;
+  margin-bottom: 22px;
+}
+
+.raw-card {
+  background: #0e0e1e;
+  border: 1px solid #23234a;
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+.raw-card summary {
+  color: #888;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.raw-card pre {
+  margin-top: 10px;
+  color: #aaa;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow-y: auto;
+  font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity &mdash; Track Studio</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/static/home.css">
+  <link rel="stylesheet" href="/static/strava_archive_activity.css">
+</head>
+<body>
+  <main class="page page--wide">
+    <div class="topbar">
+      <a href="/strava_archive/browse" class="back-link">&#8249; Activities</a>
+      <div class="unit-toggle" id="unit-toggle" role="group" aria-label="Units">
+        <button data-unit="mi" class="active">mi / ft</button>
+        <button data-unit="km">km / m</button>
+      </div>
+    </div>
+
+    <div id="loading" class="loading">Loading&hellip;</div>
+    <div id="not-found" class="not-found" hidden>Activity not found.</div>
+
+    <article id="activity-card" class="activity-card" hidden>
+      <header class="activity-header">
+        <div class="activity-title">
+          <span class="type-icon" id="type-icon"></span>
+          <div>
+            <h1 id="activity-name">&hellip;</h1>
+            <p class="meta-line">
+              <span id="activity-date"></span>
+              <span class="meta-sep" id="meta-sep-1" hidden>·</span>
+              <span id="activity-type"></span>
+              <span class="meta-sep" id="meta-sep-2" hidden>·</span>
+              <span id="activity-gear"></span>
+            </p>
+            <p class="location-line" id="activity-location" hidden></p>
+          </div>
+        </div>
+      </header>
+
+      <p id="activity-description" class="activity-description" hidden></p>
+
+      <section class="stat-grid" id="stat-grid"></section>
+
+      <section class="map-section" id="map-section">
+        <div id="map"></div>
+      </section>
+
+      <section class="cursor-section" id="cursor-section" hidden>
+        <div class="cursor-controls">
+          <button id="cursor-play" class="cursor-play" type="button" title="Play / pause">▶</button>
+          <input type="range" id="cursor-scrubber" class="cursor-scrubber" min="0" max="0" value="0" step="1">
+        </div>
+        <div class="cursor-stats" id="cursor-stats"></div>
+      </section>
+
+      <section class="elevation-section" id="elevation-section" hidden>
+        <div class="section-head">
+          <div class="series-toggles" id="series-toggles">
+            <label class="series-toggle" id="series-elev-wrap">
+              <input type="checkbox" id="series-elev" checked>
+              <span class="series-dot series-dot-elev"></span>
+              <span>Elevation</span>
+            </label>
+            <label class="series-toggle" id="series-hr-wrap" hidden>
+              <input type="checkbox" id="series-hr" checked>
+              <span class="series-dot series-dot-hr"></span>
+              <span>HR</span>
+            </label>
+            <label class="series-toggle" id="series-pwr-wrap" hidden>
+              <input type="checkbox" id="series-pwr" checked>
+              <span class="series-dot series-dot-pwr"></span>
+              <span>Power</span>
+            </label>
+            <label class="series-toggle" id="series-cad-wrap" hidden>
+              <input type="checkbox" id="series-cad" checked>
+              <span class="series-dot series-dot-cad"></span>
+              <span>Cadence</span>
+            </label>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <svg id="elev-chart" viewBox="0 0 1000 220" preserveAspectRatio="none"></svg>
+          <div class="chart-axis-x">
+            <span id="elev-x0">0</span>
+            <span id="elev-x1"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="no-track" id="no-track" hidden>
+        <p>This activity has no GPS recording &mdash; only the summary above is available.</p>
+      </section>
+
+      <details class="raw-card">
+        <summary>Show raw CSV row</summary>
+        <pre id="raw-csv"></pre>
+      </details>
+    </article>
+  </main>
+
+  <script>window.__ACTIVITY_ID = {{ activity_id|tojson }};</script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/strava_archive_activity.js"></script>
+</body>
+</html>

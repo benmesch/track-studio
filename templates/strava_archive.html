@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Strava Archive &mdash; Track Studio</title>
   <link rel="stylesheet" href="/static/home.css">
+  <link rel="stylesheet" href="/static/strava_archive.css">
 </head>
 <body>
   <main class="page">
@@ -18,6 +19,48 @@
     <div class="upload-zone">
       <p class="upload-prompt">Drop your Strava archive (.zip) here</p>
       <input type="file" id="archive-input" accept=".zip,application/zip">
+      <button id="upload-btn" class="upload-btn" disabled>Upload &amp; Ingest</button>
+    </div>
+
+    <div id="status-card" class="status-card" hidden>
+      <h3 id="status-title">Uploading&hellip;</h3>
+      <div class="progress-row">
+        <span class="progress-label">Upload</span>
+        <div class="progress-bar"><div id="upload-bar" class="progress-fill"></div></div>
+        <span id="upload-pct" class="progress-pct">0%</span>
+      </div>
+      <div id="diff-row" class="diff-row" hidden>
+        <span class="diff-chip diff-new"><strong id="diff-new">0</strong> new</span>
+        <span class="diff-chip diff-same"><strong id="diff-same">0</strong> unchanged</span>
+        <span class="diff-chip diff-removed"><strong id="diff-removed">0</strong> removed from Strava</span>
+      </div>
+      <div class="progress-row">
+        <span class="progress-label">Activities</span>
+        <div class="progress-bar"><div id="csv-bar" class="progress-fill"></div></div>
+        <span id="csv-count" class="progress-pct">0 / 0</span>
+      </div>
+      <div class="progress-row">
+        <span class="progress-label">Track files</span>
+        <div class="progress-bar"><div id="tracks-bar" class="progress-fill"></div></div>
+        <span id="tracks-count" class="progress-pct">0 / 0</span>
+      </div>
+      <p id="points-line" class="points-line"></p>
+      <details id="errors-details" hidden>
+        <summary id="errors-summary">Errors</summary>
+        <ul id="errors-list"></ul>
+      </details>
+    </div>
+
+    <div id="db-card" class="info-card db-card" hidden>
+      <h3>In the database</h3>
+      <ul class="db-stats">
+        <li><span class="stat-label">Activities</span> <span id="db-activities">0</span></li>
+        <li><span class="stat-label">Activities with track points</span> <span id="db-with-points">0</span></li>
+        <li><span class="stat-label">Total track points</span> <span id="db-points">0</span></li>
+        <li id="db-deleted-row" hidden><span class="stat-label">Removed from Strava</span> <span id="db-deleted">0</span></li>
+        <li id="db-last-row" hidden><span class="stat-label">Last upload</span> <span id="db-last">&mdash;</span></li>
+      </ul>
+      <a href="/strava_archive/browse" class="browse-link">Browse activities &rarr;</a>
     </div>
 
     <div class="info-card">
@@ -27,10 +70,11 @@
         <li>Go to <em>Settings &rarr; My Account</em>.</li>
         <li>Under <em>Download or Delete Your Account</em>, click <em>Get Started</em>.</li>
         <li>Request your archive &mdash; Strava emails you a link (can take hours to days).</li>
-        <li>Unzip the download, then upload the archive here.</li>
+        <li>Upload the downloaded <code>.zip</code> above (no need to unzip first).</li>
       </ol>
-      <p class="note">Database import is not yet implemented &mdash; this is just the shell for now.</p>
+      <p class="note">CSV activity rows ingest in seconds; GPX/FIT track points parse in the background and may take several minutes for large exports.</p>
     </div>
   </main>
+  <script src="/static/strava_archive.js"></script>
 </body>
 </html>
