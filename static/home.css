@@ -1,0 +1,144 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: #0e0e1e;
+  color: #ddd;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+}
+
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px 20px 64px;
+}
+
+.back-link {
+  display: inline-block;
+  color: #888;
+  text-decoration: none;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  margin-bottom: 28px;
+}
+.back-link:hover { color: #ddd; }
+
+.hero {
+  text-align: center;
+  margin-bottom: 40px;
+}
+.hero h1 {
+  font-size: 2.1rem;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+}
+.tagline {
+  color: #888;
+  font-size: 1rem;
+}
+
+/* ── Mode picker grid ────────────────────────── */
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 600px) {
+  .mode-grid { grid-template-columns: 1fr; }
+  .page { padding: 32px 16px 48px; }
+  .hero h1 { font-size: 1.7rem; }
+}
+
+.mode-card {
+  display: block;
+  padding: 24px 22px;
+  background: #1a1a2e;
+  border: 1px solid #2a2a4a;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
+}
+.mode-card:hover {
+  background: #1f1f3a;
+  border-color: #3a3a5a;
+  transform: translateY(-2px);
+}
+.mode-card h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 6px;
+}
+.mode-card p {
+  color: #aaa;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  margin-bottom: 16px;
+}
+.cta {
+  color: #2196F3;
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+/* ── Upload zone (Strava Archive page) ───────── */
+.upload-zone {
+  border: 2px dashed #3a3a5a;
+  border-radius: 10px;
+  padding: 36px 20px;
+  text-align: center;
+  background: #14142a;
+  margin-bottom: 28px;
+}
+.upload-prompt {
+  color: #aaa;
+  font-size: 0.95rem;
+  margin-bottom: 14px;
+}
+.upload-zone input[type="file"] {
+  color: #ccc;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.upload-zone input[type="file"]::-webkit-file-upload-button {
+  background: #2a2a4a;
+  color: #ccc;
+  border: 1px solid #444;
+  padding: 6px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  margin-right: 8px;
+}
+
+/* ── Info card ───────────────────────────────── */
+.info-card {
+  background: #14142a;
+  border: 1px solid #23234a;
+  border-radius: 8px;
+  padding: 20px 22px;
+}
+.info-card h3 {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.info-card ol {
+  padding-left: 22px;
+  color: #bbb;
+  line-height: 1.7;
+  font-size: 0.92rem;
+}
+.info-card em { color: #ddd; font-style: normal; font-weight: 500; }
+.note {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #23234a;
+  color: #777;
+  font-size: 0.85rem;
+  font-style: italic;
+}

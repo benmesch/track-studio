@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Strava Archive &mdash; Track Studio</title>
+  <link rel="stylesheet" href="/static/home.css">
+</head>
+<body>
+  <main class="page">
+    <a href="/" class="back-link">&#8249; Track Studio</a>
+
+    <header class="hero">
+      <h1>Strava Archive</h1>
+      <p class="tagline">Upload your activity export to query your data</p>
+    </header>
+
+    <div class="upload-zone">
+      <p class="upload-prompt">Drop your Strava archive (.zip) here</p>
+      <input type="file" id="archive-input" accept=".zip,application/zip">
+    </div>
+
+    <div class="info-card">
+      <h3>How to get your Strava archive</h3>
+      <ol>
+        <li>Log in to Strava on the web.</li>
+        <li>Go to <em>Settings &rarr; My Account</em>.</li>
+        <li>Under <em>Download or Delete Your Account</em>, click <em>Get Started</em>.</li>
+        <li>Request your archive &mdash; Strava emails you a link (can take hours to days).</li>
+        <li>Unzip the download, then upload the archive here.</li>
+      </ol>
+      <p class="note">Database import is not yet implemented &mdash; this is just the shell for now.</p>
+    </div>
+  </main>
+</body>
+</html>

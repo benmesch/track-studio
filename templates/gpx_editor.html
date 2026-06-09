@@ -3,14 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GPX Editor</title>
+  <title>GPX Editor &mdash; Track Studio</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/gpx_editor.css">
 </head>
 <body>
   <div id="sidebar">
     <div id="sidebar-header">
-      <h2>GPX Editor</h2>
+      <div class="brand-block">
+        <a href="/" class="back-to-home">&#8249; Track Studio</a>
+        <h2>GPX Editor</h2>
+      </div>
       <div class="unit-toggle">
         <button class="unit-btn" data-unit="metric">m</button>
         <button class="unit-btn" data-unit="imperial">ft</button>
@@ -161,6 +164,6 @@
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/app.js"></script>
+  <script src="/static/gpx_editor.js"></script>
 </body>
 </html>
