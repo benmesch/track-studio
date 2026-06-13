@@ -177,6 +177,54 @@ def _insert_activity(conn, record):
     conn.execute(_ACT_INSERT_SQL, [record.get(c) for c in _ACT_COLS])
 
 
+# Max wall-clock gap allowed when matching a Strava CSV row to a previously-
+# saved local activity. Device clocks and "started recording" / "first GPS fix"
+# can drift this much — bigger window than needed for clean recordings, but
+# small enough that two distinct rides within 2 min are vanishingly rare.
+_LOCAL_MATCH_TOLERANCE_S = 120
+
+
+def _link_local_to_strava(conn, strava_id, strava_start_time, strava_type):
+    """Mark an unpaired local activity as superseded by this Strava row, if
+    one matches within the tolerance window. Returns the local id (or None).
+
+    Linking is bidirectional: the local gets replaced_by_id + replaced_at +
+    deleted_from_strava=1 (so it drops out of the default browse view); the
+    Strava row gets replaced_local_id + replaced_at (so its detail page can
+    surface a 'replaced your local upload' banner).
+    """
+    if strava_id is None or not strava_start_time or not strava_type:
+        return None
+    row = conn.execute(
+        """
+        SELECT id FROM activities
+         WHERE source = 'local'
+           AND replaced_by_id IS NULL
+           AND type = ?
+           AND start_time IS NOT NULL
+           AND ABS(strftime('%s', start_time) - strftime('%s', ?)) <= ?
+         ORDER BY ABS(strftime('%s', start_time) - strftime('%s', ?))
+         LIMIT 1
+        """,
+        (strava_type, strava_start_time, _LOCAL_MATCH_TOLERANCE_S, strava_start_time),
+    ).fetchone()
+    if not row:
+        return None
+    local_id = row[0]
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        "UPDATE activities "
+        "   SET replaced_by_id=?, replaced_at=?, deleted_from_strava=1 "
+        " WHERE id=?",
+        (strava_id, now, local_id),
+    )
+    conn.execute(
+        "UPDATE activities SET replaced_local_id=?, replaced_at=? WHERE id=?",
+        (local_id, now, strava_id),
+    )
+    return local_id
+
+
 # ───────────────────────────── GPX/FIT → points ─────────────────────────────
 
 
@@ -319,6 +367,7 @@ class IngestState:
         self.activities_new = 0       # not seen in any prior ingest
         self.activities_existing = 0  # already in DB
         self.activities_removed = 0   # in DB but missing from this CSV
+        self.locals_replaced = 0      # local rows linked to a Strava row this run
         self.tracks_total = 0
         self.tracks_parsed = 0
         self.points_inserted = 0
@@ -337,6 +386,7 @@ class IngestState:
                 "activities_new":      self.activities_new,
                 "activities_existing": self.activities_existing,
                 "activities_removed":  self.activities_removed,
+                "locals_replaced":     self.locals_replaced,
                 "tracks_total":        self.tracks_total,
                 "tracks_parsed":       self.tracks_parsed,
                 "points_inserted":     self.points_inserted,
@@ -437,8 +487,16 @@ def run_ingest(zip_path):
                 for rec in records:
                     try:
                         _insert_activity(conn, rec)
+                        linked = _link_local_to_strava(
+                            conn,
+                            rec.get("id"),
+                            rec.get("start_time"),
+                            rec.get("type"),
+                        )
                         with STATE.lock:
                             STATE.activities_inserted += 1
+                            if linked is not None:
+                                STATE.locals_replaced += 1
                     except Exception as e:
                         with STATE.lock:
                             STATE.errors.append(f"activity {rec.get('id')}: {e}")

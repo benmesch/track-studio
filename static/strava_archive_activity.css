@@ -55,6 +55,19 @@
 }
 .not-found { color: #e57373; }
 
+.replacement-banner {
+  padding: 10px 14px;
+  margin: -12px -12px 14px;
+  border-radius: 8px 8px 0 0;
+  background: #1a2640;
+  color: #b0c4de;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  border-bottom: 1px solid #2a2a4a;
+}
+.replacement-banner.superseded { background: #2a1f10; color: #d2b48c; }
+.replacement-banner a { color: #82b1ff; }
+
 .activity-card {
   background: #14142a;
   border: 1px solid #23234a;

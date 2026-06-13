@@ -578,7 +578,27 @@
       dl.hidden = false;
     }
 
+    renderReplacementBanner(a);
+
     document.title = `${a.name || "Activity"} · Track Studio`;
+  }
+
+  function renderReplacementBanner(a) {
+    const el = $("replacement-banner");
+    const when = a.replaced_at ? new Date(a.replaced_at).toLocaleDateString() : null;
+    if (a.replaced_local_id != null) {
+      // This is a Strava row that replaced an earlier local upload.
+      const link = `<a href="/strava_archive/activity/${a.replaced_local_id}">view your original upload</a>`;
+      el.className = "replacement-banner";
+      el.innerHTML = `This activity replaced a local upload${when ? ` on ${when}` : ""}. The original file is still on disk — ${link}.`;
+      el.hidden = false;
+    } else if (a.replaced_by_id != null) {
+      // This is a local row that was superseded by a later Strava ingest.
+      const link = `<a href="/strava_archive/activity/${a.replaced_by_id}">go to the Strava version</a>`;
+      el.className = "replacement-banner superseded";
+      el.innerHTML = `Superseded by a Strava archive activity${when ? ` on ${when}` : ""} — ${link}. This local copy is kept for safety.`;
+      el.hidden = false;
+    }
   }
 
   // ───────────────── Unit toggle ─────────────────
