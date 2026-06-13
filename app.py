@@ -5,9 +5,10 @@ from pathlib import Path
 from threading import Thread
 
 import fitdecode
-from flask import Flask, abort, jsonify, render_template, request
+from flask import Flask, Response, abort, jsonify, render_template, request
 
 import db
+from gpx_writer import gpx_filename, write_gpx
 from ingest import STATE, run_ingest
 
 ARCHIVES_DIR = Path(__file__).parent / "archives"
@@ -293,6 +294,40 @@ def strava_activity_detail(activity_id):
         return jsonify({"activity": activity, "points": points})
     finally:
         conn.close()
+
+
+@app.get("/api/strava/activities/<int:activity_id>/gpx")
+def strava_activity_gpx(activity_id):
+    """Serialize an activity + its track points back to a downloadable GPX."""
+    conn = db.connect()
+    try:
+        row = conn.execute(
+            "SELECT id, name, type, start_time, has_points "
+            "  FROM activities WHERE id=?", (activity_id,)
+        ).fetchone()
+        if not row:
+            abort(404)
+        if not row["has_points"]:
+            return jsonify({"error": "activity has no GPS points"}), 409
+        activity = dict(row)
+        points = [
+            dict(p) for p in conn.execute(
+                "SELECT sequence, time, lat, lon, elevation_m, "
+                "       hr, cadence, power, temperature_c "
+                "  FROM track_points WHERE activity_id=? ORDER BY sequence",
+                (activity_id,),
+            )
+        ]
+    finally:
+        conn.close()
+
+    body = write_gpx(activity, points)
+    filename = gpx_filename(activity)
+    return Response(
+        body,
+        mimetype="application/gpx+xml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/api/strava/activities/facets")

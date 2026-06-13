@@ -8,6 +8,25 @@
 }
 .topbar .back-link { margin-bottom: 0; }
 
+.topbar-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.download-gpx {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border: 1px solid #2a2a4a;
+  border-radius: 6px;
+  background: #14142a;
+  color: #ddd;
+  font-size: 0.78rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+.download-gpx:hover { background: #1c1c38; color: #fff; }
+
 .unit-toggle {
   display: inline-flex;
   border: 1px solid #2a2a4a;

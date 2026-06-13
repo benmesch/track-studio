@@ -572,6 +572,12 @@
       $("raw-csv").textContent = JSON.stringify(a.raw_csv, null, 2);
     }
 
+    if (a.has_points) {
+      const dl = $("download-gpx");
+      dl.href   = `/api/strava/activities/${a.id}/gpx`;
+      dl.hidden = false;
+    }
+
     document.title = `${a.name || "Activity"} · Track Studio`;
   }
 
