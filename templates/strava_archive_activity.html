@@ -42,7 +42,44 @@
             <p class="location-line" id="activity-location" hidden></p>
           </div>
         </div>
+        <button id="meta-edit-btn" class="meta-edit-btn" type="button" hidden>Edit</button>
       </header>
+
+      <form id="meta-edit-form" class="meta-edit-form" hidden>
+        <label class="meta-field">
+          <span>Name</span>
+          <input type="text" id="meta-name" autocomplete="off">
+        </label>
+        <label class="meta-field">
+          <span>Type</span>
+          <select id="meta-type">
+            <option value="Ride">Ride</option>
+            <option value="Virtual Ride">Virtual Ride</option>
+            <option value="E-Bike Ride">E-Bike Ride</option>
+            <option value="Run">Run</option>
+            <option value="Walk">Walk</option>
+            <option value="Hike">Hike</option>
+            <option value="Swim">Swim</option>
+            <option value="Workout">Workout</option>
+            <option value="Yoga">Yoga</option>
+            <option value="Rowing">Rowing</option>
+            <option value="Kayaking">Kayaking</option>
+          </select>
+        </label>
+        <label class="meta-field">
+          <span>Gear</span>
+          <input type="text" id="meta-gear" autocomplete="off" placeholder="(none)">
+        </label>
+        <label class="meta-field meta-field--full">
+          <span>Description</span>
+          <textarea id="meta-description" rows="2"></textarea>
+        </label>
+        <div class="meta-actions">
+          <button type="button" id="meta-cancel-btn" class="meta-btn-secondary">Cancel</button>
+          <button type="submit" id="meta-save-btn"  class="meta-btn-primary">Save changes</button>
+          <span id="meta-status" class="meta-status" hidden></span>
+        </div>
+      </form>
 
       <p id="activity-description" class="activity-description" hidden></p>
 

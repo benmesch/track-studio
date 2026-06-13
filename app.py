@@ -314,6 +314,43 @@ def strava_activity_detail(activity_id):
         conn.close()
 
 
+@app.patch("/api/strava/activities/<sint:activity_id>/meta")
+def strava_activity_meta_update(activity_id):
+    """Edit name / type / gear / description on a locally-saved activity.
+
+    Strava-sourced rows are read-only here — the next archive ingest would
+    clobber any edit, so blocking the write is less surprising than silently
+    losing it. JSON body: any subset of {name, type, gear, description}.
+    """
+    body = request.get_json(silent=True) or {}
+    allowed = {"name", "type", "gear", "description"}
+    updates = {k: (v.strip() if isinstance(v, str) else v)
+               for k, v in body.items() if k in allowed}
+    if not updates:
+        return jsonify({"error": "no editable fields supplied"}), 400
+
+    conn = db.connect()
+    try:
+        row = conn.execute(
+            "SELECT id, source FROM activities WHERE id=?", (activity_id,)
+        ).fetchone()
+        if not row:
+            abort(404)
+        if row["source"] != "local":
+            return jsonify({
+                "error": "only locally-saved activities can be edited "
+                         "(Strava-sourced rows get rewritten by the next ingest)",
+            }), 409
+        cols = ", ".join(f"{k}=?" for k in updates)
+        conn.execute(
+            f"UPDATE activities SET {cols} WHERE id=?",
+            list(updates.values()) + [activity_id],
+        )
+        return jsonify({"ok": True, "updated": updates})
+    finally:
+        conn.close()
+
+
 @app.post("/api/strava/activities/local")
 def strava_activity_local_upload():
     """Save a user-uploaded or editor-produced GPX as a local activity row.

@@ -578,10 +578,80 @@
       dl.hidden = false;
     }
 
+    if (a.source === "local") {
+      $("meta-edit-btn").hidden = false;
+    }
+
     renderReplacementBanner(a);
 
     document.title = `${a.name || "Activity"} · Track Studio`;
   }
+
+  // ───────────────── Meta edit (local activities only) ─────────────────
+
+  function openMetaEdit() {
+    const a = state.data && state.data.activity;
+    if (!a) return;
+    $("meta-name").value        = a.name || "";
+    $("meta-gear").value        = a.gear || "";
+    $("meta-description").value = a.description || "";
+    const sel = $("meta-type");
+    const opts = Array.from(sel.options).map(o => o.value);
+    if (a.type && !opts.includes(a.type)) {
+      const o = document.createElement("option");
+      o.value = a.type; o.textContent = a.type;
+      sel.appendChild(o);
+    }
+    sel.value = a.type || "Workout";
+    setMetaStatus("");
+    $("meta-edit-form").hidden = false;
+    $("meta-edit-btn").hidden  = true;
+    $("meta-name").focus();
+  }
+
+  function closeMetaEdit() {
+    $("meta-edit-form").hidden = true;
+    $("meta-edit-btn").hidden  = false;
+    setMetaStatus("");
+  }
+
+  function setMetaStatus(text, kind) {
+    const el = $("meta-status");
+    el.className = "meta-status" + (kind ? " " + kind : "");
+    el.textContent = text;
+    el.hidden = !text;
+  }
+
+  async function submitMetaEdit(ev) {
+    ev.preventDefault();
+    const a = state.data && state.data.activity;
+    if (!a) return;
+    const body = {
+      name:        $("meta-name").value.trim(),
+      type:        $("meta-type").value,
+      gear:        $("meta-gear").value.trim() || null,
+      description: $("meta-description").value.trim() || null,
+    };
+    setMetaStatus("Saving…");
+    try {
+      const r = await fetch(`/api/strava/activities/${a.id}/meta`, {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(body),
+      });
+      const j = await r.json();
+      if (!r.ok) { setMetaStatus(j.error || `Failed (${r.status})`, "error"); return; }
+      Object.assign(a, body);
+      renderHeader(a);
+      closeMetaEdit();
+    } catch (err) {
+      setMetaStatus(`Failed: ${err.message || err}`, "error");
+    }
+  }
+
+  $("meta-edit-btn")?.addEventListener("click",  openMetaEdit);
+  $("meta-cancel-btn")?.addEventListener("click", closeMetaEdit);
+  $("meta-edit-form")?.addEventListener("submit", submitMetaEdit);
 
   function renderReplacementBanner(a) {
     const el = $("replacement-banner");
