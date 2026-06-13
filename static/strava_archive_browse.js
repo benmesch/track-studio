@@ -709,6 +709,25 @@
     runQuery(false);
   });
 
+  // ───────────────── Local GPX upload ─────────────────
+  // Saves a single GPX (from a recording device or the in-app editor) as a
+  // local activity row. On success, jump straight to its detail page.
+  $("gpx-upload-input")?.addEventListener("change", async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";  // allow re-selecting the same file
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("gpx", file);
+    try {
+      const r = await fetch("/api/strava/activities/local", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) { alert(j.error || `Upload failed (${r.status})`); return; }
+      location.href = j.url;
+    } catch (err) {
+      alert(`Upload failed: ${err.message || err}`);
+    }
+  });
+
   // ───────────────── Init ─────────────────
 
   async function init() {

@@ -502,6 +502,32 @@ input[type="range"] {
 .btn-primary:hover { background: #1976D2; }
 .btn-primary:active { background: #1565C0; }
 
+.btn-secondary {
+  background: transparent;
+  color: #ddd;
+  border: 1px solid #2a2a4a;
+  padding: 10px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  width: 100%;
+  margin-top: 8px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.btn-secondary:hover { background: #1c1c38; color: #fff; border-color: #3a3a5a; }
+.btn-secondary:disabled { opacity: 0.5; cursor: default; }
+
+.save-status {
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: #aaa;
+  line-height: 1.4;
+}
+.save-status.ok    { color: #81c784; }
+.save-status.error { color: #e57373; }
+.save-status a     { color: #2196F3; }
+
 /* ── Drop hint ───────────────────────────────── */
 #drop-hint {
   margin-top: auto;

@@ -158,6 +158,8 @@ function loadGpxText(text, filename) {
   resetControls();
   controls.hidden = false;
   downloadBtn.hidden = false;
+  document.getElementById('save-btn').hidden = false;
+  document.getElementById('save-status').hidden = true;
   fileSection.classList.add('collapsed');
   fileToggle.setAttribute('aria-expanded', 'false');
   updateDisplay();
@@ -593,16 +595,14 @@ function setTrkptHr(doc, trkpt, hr) {
   hrEl.textContent = String(hr);
 }
 
-// ── Download (fully client-side) ──────────────────────────────────────────────
-downloadBtn.addEventListener('click', () => {
-  if (!currentDoc) return;
-
+// ── Build edited GPX bytes (shared by Download + Save) ────────────────────────
+function buildEditedGpx() {
+  if (!currentDoc) return null;
   const doc = currentDoc.cloneNode(true);
   const trkpts = Array.from(doc.querySelectorAll('trkpt'));
   const total = trkpts.length;
 
-  // Inject merged HR into every point first (indices still line up with
-  // allPoints here, before any removals).
+  // Inject merged HR first — indices still align with allPoints here.
   if (hrLoaded) {
     doc.documentElement.setAttribute('xmlns:gpxtpx', GPXTPX_NS);
     for (let i = 0; i < total; i++) {
@@ -611,13 +611,10 @@ downloadBtn.addEventListener('click', () => {
     }
   }
 
-  // Build the set of indices to remove (start + end + spot-marked), then drop
-  // them in descending order so earlier indices stay valid.
   const toRemove = new Set();
   for (let i = 0; i < trimStart; i++) toRemove.add(i);
   for (let i = total - trimEnd; i < total; i++) toRemove.add(i);
   removedSet.forEach(idx => toRemove.add(idx));
-
   [...toRemove].sort((a, b) => b - a).forEach(idx => {
     const pt = trkpts[idx];
     if (pt && pt.parentNode) pt.parentNode.removeChild(pt);
@@ -625,17 +622,59 @@ downloadBtn.addEventListener('click', () => {
 
   const xmlStr = new XMLSerializer().serializeToString(doc);
   const blob = new Blob([xmlStr], { type: 'application/gpx+xml' });
-  const url = URL.createObjectURL(blob);
-
   const suffix = (toRemove.size > 0 ? '_trimmed' : '') + (hrLoaded ? '_hr' : '');
+  const filename =
+    currentFilename.replace(/\.gpx$/i, (suffix || '_edited') + '.gpx') || 'edited.gpx';
+  return { blob, filename, keptCount: total - toRemove.size };
+}
+
+// ── Download (fully client-side) ──────────────────────────────────────────────
+downloadBtn.addEventListener('click', () => {
+  const built = buildEditedGpx();
+  if (!built) return;
+  const url = URL.createObjectURL(built.blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = currentFilename.replace(/\.gpx$/i, (suffix || '_edited') + '.gpx')
-            || 'edited.gpx';
+  a.download = built.filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+});
+
+// ── Save to "My Activities" ───────────────────────────────────────────────────
+const saveBtn    = document.getElementById('save-btn');
+const saveStatus = document.getElementById('save-status');
+
+function setSaveStatus(text, kind) {
+  saveStatus.className = 'save-status' + (kind ? ' ' + kind : '');
+  saveStatus.innerHTML = text;
+  saveStatus.hidden = !text;
+}
+
+saveBtn.addEventListener('click', async () => {
+  const built = buildEditedGpx();
+  if (!built) return;
+  saveBtn.disabled = true;
+  setSaveStatus('Saving&hellip;', '');
+  try {
+    const fd = new FormData();
+    fd.append('gpx', built.blob, built.filename);
+    const r = await fetch('/api/strava/activities/local', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok) {
+      setSaveStatus(`Save failed: ${j.error || r.status}`, 'error');
+    } else {
+      setSaveStatus(
+        `Saved &mdash; <a href="${j.url}">view in My Activities</a>`,
+        'ok',
+      );
+    }
+  } catch (err) {
+    setSaveStatus(`Save failed: ${err.message || err}`, 'error');
+  } finally {
+    saveBtn.disabled = false;
+  }
 });
 
 // ── Event wiring ──────────────────────────────────────────────────────────────

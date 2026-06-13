@@ -6,10 +6,12 @@ from threading import Thread
 
 import fitdecode
 from flask import Flask, Response, abort, jsonify, render_template, request
+from werkzeug.routing import BaseConverter
 
 import db
 from gpx_writer import gpx_filename, write_gpx
 from ingest import STATE, run_ingest
+from local_upload import save_local_activity
 
 ARCHIVES_DIR = Path(__file__).parent / "archives"
 ARCHIVES_DIR.mkdir(exist_ok=True)
@@ -17,6 +19,22 @@ ARCHIVES_DIR.mkdir(exist_ok=True)
 app = Flask(__name__)
 # Strava archives can be a few GB for active users.
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024 * 1024  # 5 GB
+
+
+class _SignedIntConverter(BaseConverter):
+    """Like Flask's built-in <int:>, but accepts negatives — locally-saved
+    activities use negative IDs to keep them in the same numeric namespace
+    as Strava's positive ones."""
+    regex = r"-?\d+"
+
+    def to_python(self, value):
+        return int(value)
+
+    def to_url(self, value):
+        return str(value)
+
+
+app.url_map.converters["sint"] = _SignedIntConverter
 
 db.init()
 
@@ -264,12 +282,12 @@ def strava_activities():
         conn.close()
 
 
-@app.route("/strava_archive/activity/<int:activity_id>")
+@app.route("/strava_archive/activity/<sint:activity_id>")
 def strava_activity_page(activity_id):
     return render_template("strava_archive_activity.html", activity_id=activity_id)
 
 
-@app.get("/api/strava/activities/<int:activity_id>")
+@app.get("/api/strava/activities/<sint:activity_id>")
 def strava_activity_detail(activity_id):
     conn = db.connect()
     try:
@@ -296,7 +314,39 @@ def strava_activity_detail(activity_id):
         conn.close()
 
 
-@app.get("/api/strava/activities/<int:activity_id>/gpx")
+@app.post("/api/strava/activities/local")
+def strava_activity_local_upload():
+    """Save a user-uploaded or editor-produced GPX as a local activity row.
+
+    Multipart form: `gpx` (file, required), `name`/`type`/`gear`/`description`
+    (optional overrides). Returns the new (negative) activity id and the
+    parsed summary that the client can use to redirect to the detail page.
+    """
+    uploaded = request.files.get("gpx")
+    if not uploaded or not uploaded.filename:
+        return jsonify({"error": "no file uploaded (field: gpx)"}), 400
+    if not uploaded.filename.lower().endswith(".gpx"):
+        return jsonify({"error": "expected a .gpx file"}), 400
+
+    name        = (request.form.get("name") or "").strip() or None
+    type_       = (request.form.get("type") or "").strip() or None
+    gear        = (request.form.get("gear") or "").strip() or None
+    description = (request.form.get("description") or "").strip() or None
+
+    try:
+        aid = save_local_activity(
+            uploaded.read(), name=name, type_=type_, gear=gear,
+            description=description,
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:  # noqa: BLE001 - report parse failure to client
+        return jsonify({"error": f"could not save activity: {exc}"}), 400
+
+    return jsonify({"id": aid, "url": f"/strava_archive/activity/{aid}"}), 201
+
+
+@app.get("/api/strava/activities/<sint:activity_id>/gpx")
 def strava_activity_gpx(activity_id):
     """Serialize an activity + its track points back to a downloadable GPX."""
     conn = db.connect()

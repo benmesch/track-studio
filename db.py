@@ -98,6 +98,17 @@ def init():
         _ensure_column(conn, "activities", "deleted_from_strava",
                        "INTEGER NOT NULL DEFAULT 0")
         _ensure_column(conn, "activities", "location", "TEXT")
+        # Local-upload support: activities created from a recording-device file
+        # or the in-app GPX editor get source='local' + a negative id. When a
+        # later Strava zip ingest matches a local by start_time, the local row
+        # is linked + hidden via deleted_from_strava=1 (same visibility flag
+        # the strava-side already uses for rows that dropped out of an export).
+        _ensure_column(conn, "activities", "source",
+                       "TEXT NOT NULL DEFAULT 'strava'")
+        _ensure_column(conn, "activities", "original_file_path", "TEXT")
+        _ensure_column(conn, "activities", "replaced_local_id",  "INTEGER")
+        _ensure_column(conn, "activities", "replaced_by_id",     "INTEGER")
+        _ensure_column(conn, "activities", "replaced_at",        "TEXT")
         run_hr_cleanup(conn)
         run_max_hr_backfill(conn)
         run_avg_hr_cleanup(conn)
