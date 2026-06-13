@@ -131,6 +131,20 @@
         </div>
       </div>
 
+      <div class="collapsible hr-section collapsed">
+        <button class="section-toggle" id="hr-toggle" type="button" aria-expanded="false">
+          <span>Heart rate</span>
+          <span class="chevron">&#9662;</span>
+        </button>
+        <div class="section-content">
+          <div class="hint">Add HR from a matching <code>.fit</code> file (same activity). Points are matched by timestamp.</div>
+          <label for="fit-input">Load .fit file</label>
+          <input type="file" id="fit-input" accept=".fit">
+          <div class="hr-status" id="hr-status" hidden></div>
+          <button id="hr-clear-btn" class="btn-action clear" hidden>Remove HR data</button>
+        </div>
+      </div>
+
       <div class="keep-row">
         <span id="keep-count" class="keep-stat">Keeping all points</span>
       </div>

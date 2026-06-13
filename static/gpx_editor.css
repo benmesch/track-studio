@@ -285,6 +285,21 @@ input[type="range"] {
   line-height: 1.4;
 }
 
+.hr-status {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  background: #2a2a4a;
+  color: #ccc;
+}
+.hr-status[hidden] { display: none; }
+.hr-status.ok    { color: #81c784; background: #233a2a; }
+.hr-status.error { color: #ef9a9a; background: #3a2323; }
+
+.hr-section .btn-action.clear { margin-top: 8px; width: 100%; }
+
 .action-row {
   display: flex;
   gap: 6px;

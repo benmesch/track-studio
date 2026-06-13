@@ -1,8 +1,10 @@
+import io
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import Thread
 
+import fitdecode
 from flask import Flask, abort, jsonify, render_template, request
 
 import db
@@ -26,6 +28,82 @@ def home():
 @app.route("/gpx_editor")
 def gpx_editor():
     return render_template("gpx_editor.html")
+
+
+def _fit_hr_samples(data):
+    """Extract (timestamp, heart_rate) samples from raw .fit bytes.
+
+    Returns a list of {"t": <epoch_ms_utc>, "hr": <int>} sorted by time,
+    including only records that carry both a timestamp and an HR value.
+    """
+    samples = []
+    with fitdecode.FitReader(io.BytesIO(data)) as reader:
+        for frame in reader:
+            if not isinstance(frame, fitdecode.FitDataMessage):
+                continue
+            if frame.name != "record":
+                continue
+
+            def g(field):
+                try:
+                    return frame.get_value(field)
+                except (KeyError, ValueError, AttributeError):
+                    return None
+
+            ts = g("timestamp")
+            hr = g("heart_rate")
+            if ts is None or hr is None or not hasattr(ts, "timestamp"):
+                continue
+            try:
+                hr_int = int(hr)
+            except (TypeError, ValueError):
+                continue
+            # 0/negative HR means "no sensor" (common in Zwift exports without a
+            # strap) — treat as no data so we don't emit bogus 0-bpm samples.
+            if hr_int <= 0:
+                continue
+            # FIT timestamps are UTC; normalize to epoch milliseconds so the
+            # browser can match them against GPX <time> values directly.
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            samples.append({"t": int(ts.timestamp() * 1000), "hr": hr_int})
+
+    samples.sort(key=lambda s: s["t"])
+    return samples
+
+
+@app.post("/api/fit/hr")
+def fit_hr():
+    """Parse an uploaded .fit and return its heart-rate samples by time.
+
+    Used by the GPX Editor to merge HR data into a GPX that lacks it.
+    """
+    uploaded = request.files.get("fit")
+    if not uploaded or not uploaded.filename:
+        return jsonify({"error": "no file uploaded (field: fit)"}), 400
+    if not uploaded.filename.lower().endswith(".fit"):
+        return jsonify({"error": "expected a .fit file"}), 400
+
+    try:
+        samples = _fit_hr_samples(uploaded.read())
+    except Exception as exc:  # noqa: BLE001 - report parse failure to client
+        return jsonify({"error": f"could not parse .fit file: {exc}"}), 400
+
+    if not samples:
+        return jsonify({
+            "error": "no heart-rate data found in this .fit file",
+            "samples": [], "count": 0,
+        }), 200
+
+    hrs = [s["hr"] for s in samples]
+    return jsonify({
+        "samples": samples,
+        "count":   len(samples),
+        "hr_min":  min(hrs),
+        "hr_max":  max(hrs),
+        "t_start": samples[0]["t"],
+        "t_end":   samples[-1]["t"],
+    })
 
 
 @app.route("/strava_archive")

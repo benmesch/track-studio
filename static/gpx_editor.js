@@ -9,6 +9,12 @@ let trimEnd = 0;
 let removedSet = new Set();   // indices marked for spot removal
 let cursorIdx = 0;
 let units = localStorage.getItem('gpx-units') || 'metric';  // 'metric' | 'imperial'
+let hrLoaded = false;         // true once HR from a .fit has been merged in
+
+// Garmin TrackPointExtension namespace — how GPX carries per-point HR.
+const GPXTPX_NS = 'http://www.garmin.com/xmlschemas/TrackPointExtension/v1';
+// Max time gap (ms) allowed when matching a GPX point to a FIT HR sample.
+const HR_MATCH_TOLERANCE_MS = 10000;
 
 // ── Map setup ─────────────────────────────────────────────────────────────────
 const map = L.map('map', { zoomControl: true }).setView([20, 0], 2);
@@ -60,6 +66,9 @@ const infoNextEl      = document.getElementById('info-next');
 const markedListWrap  = document.querySelector('.marked-list-wrap');
 const markedListEl    = document.getElementById('marked-list');
 const markedCountInlineEl = document.getElementById('marked-count-inline');
+const fitInput        = document.getElementById('fit-input');
+const hrStatusEl      = document.getElementById('hr-status');
+const hrClearBtn      = document.getElementById('hr-clear-btn');
 
 // ── Generic collapsible sections ──────────────────────────────────────────────
 document.querySelectorAll('.section-toggle').forEach(btn => {
@@ -145,6 +154,7 @@ function loadGpxText(text, filename) {
   trimEnd = 0;
   removedSet = new Set();
   cursorIdx = 0;
+  resetHr();
   resetControls();
   controls.hidden = false;
   downloadBtn.hidden = false;
@@ -481,6 +491,108 @@ map.on('click', e => {
   setCursor(nearestPointIndex(e.latlng.lat, e.latlng.lng));
 });
 
+// ── Heart-rate merge (from a separate .fit file) ──────────────────────────────
+function resetHr() {
+  hrLoaded = false;
+  allPoints.forEach(p => { p.hr = null; });
+  if (fitInput) fitInput.value = '';
+  if (hrStatusEl) { hrStatusEl.hidden = true; hrStatusEl.textContent = ''; hrStatusEl.className = 'hr-status'; }
+  if (hrClearBtn) hrClearBtn.hidden = true;
+}
+
+// Match each GPX point to the nearest FIT HR sample (within tolerance) by time.
+// Both arrays are time-ascending; we binary-search per point for clarity.
+function mergeHrSamples(samples) {
+  const times = samples.map(s => s.t);
+  let matched = 0;
+  for (const p of allPoints) {
+    p.hr = null;
+    if (p.time == null || times.length === 0) continue;
+    let lo = 0, hi = times.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (times[mid] < p.time) lo = mid + 1; else hi = mid;
+    }
+    let best = lo, bestD = Math.abs(times[lo] - p.time);
+    if (lo > 0) {
+      const d = Math.abs(times[lo - 1] - p.time);
+      if (d < bestD) { best = lo - 1; bestD = d; }
+    }
+    if (bestD <= HR_MATCH_TOLERANCE_MS) { p.hr = samples[best].hr; matched++; }
+  }
+  return matched;
+}
+
+function showHrStatus(msg, kind) {
+  hrStatusEl.hidden = false;
+  hrStatusEl.textContent = msg;
+  hrStatusEl.className = 'hr-status' + (kind ? ' ' + kind : '');
+}
+
+async function loadFitFile(file) {
+  if (!allPoints.length) { alert('Load a GPX file first.'); return; }
+  showHrStatus('Parsing .fit…', '');
+  hrClearBtn.hidden = true;
+
+  const form = new FormData();
+  form.append('fit', file);
+
+  let data;
+  try {
+    const resp = await fetch('/api/fit/hr', { method: 'POST', body: form });
+    data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+  } catch (err) {
+    showHrStatus('Could not read .fit: ' + err.message, 'error');
+    return;
+  }
+
+  if (!data.count) {
+    showHrStatus(data.error || 'No heart-rate data in that .fit file.', 'error');
+    return;
+  }
+
+  const matched = mergeHrSamples(data.samples);
+  if (matched === 0) {
+    hrLoaded = false;
+    showHrStatus(
+      `No points matched. The .fit and GPX timestamps don't overlap — ` +
+      `is this the same activity?`, 'error');
+    hrClearBtn.hidden = true;
+  } else {
+    hrLoaded = true;
+    const pct = Math.round(matched / allPoints.length * 100);
+    showHrStatus(
+      `Merged HR into ${matched.toLocaleString()} / ${allPoints.length.toLocaleString()} ` +
+      `points (${pct}%) · ${data.hr_min}–${data.hr_max} bpm`, 'ok');
+    hrClearBtn.hidden = false;
+  }
+  updateDisplay();
+}
+
+fitInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) loadFitFile(file);
+});
+
+hrClearBtn.addEventListener('click', () => {
+  resetHr();
+  updateDisplay();
+});
+
+// Inject <gpxtpx:hr> into a trkpt, creating the extension wrappers as needed.
+function setTrkptHr(doc, trkpt, hr) {
+  let ext = trkpt.getElementsByTagName('extensions')[0];
+  if (!ext) { ext = doc.createElement('extensions'); trkpt.appendChild(ext); }
+  let tpe = ext.getElementsByTagNameNS(GPXTPX_NS, 'TrackPointExtension')[0]
+         || ext.getElementsByTagName('gpxtpx:TrackPointExtension')[0];
+  if (!tpe) { tpe = doc.createElementNS(GPXTPX_NS, 'gpxtpx:TrackPointExtension'); ext.appendChild(tpe); }
+  let hrEl = tpe.getElementsByTagNameNS(GPXTPX_NS, 'hr')[0]
+          || tpe.getElementsByTagName('gpxtpx:hr')[0];
+  if (!hrEl) { hrEl = doc.createElementNS(GPXTPX_NS, 'gpxtpx:hr'); tpe.appendChild(hrEl); }
+  hrEl.textContent = String(hr);
+}
+
 // ── Download (fully client-side) ──────────────────────────────────────────────
 downloadBtn.addEventListener('click', () => {
   if (!currentDoc) return;
@@ -488,6 +600,16 @@ downloadBtn.addEventListener('click', () => {
   const doc = currentDoc.cloneNode(true);
   const trkpts = Array.from(doc.querySelectorAll('trkpt'));
   const total = trkpts.length;
+
+  // Inject merged HR into every point first (indices still line up with
+  // allPoints here, before any removals).
+  if (hrLoaded) {
+    doc.documentElement.setAttribute('xmlns:gpxtpx', GPXTPX_NS);
+    for (let i = 0; i < total; i++) {
+      const hr = allPoints[i] && allPoints[i].hr;
+      if (hr != null && trkpts[i]) setTrkptHr(doc, trkpts[i], hr);
+    }
+  }
 
   // Build the set of indices to remove (start + end + spot-marked), then drop
   // them in descending order so earlier indices stay valid.
@@ -505,9 +627,11 @@ downloadBtn.addEventListener('click', () => {
   const blob = new Blob([xmlStr], { type: 'application/gpx+xml' });
   const url = URL.createObjectURL(blob);
 
+  const suffix = (toRemove.size > 0 ? '_trimmed' : '') + (hrLoaded ? '_hr' : '');
   const a = document.createElement('a');
   a.href = url;
-  a.download = currentFilename.replace(/\.gpx$/i, '_trimmed.gpx') || 'trimmed.gpx';
+  a.download = currentFilename.replace(/\.gpx$/i, (suffix || '_edited') + '.gpx')
+            || 'edited.gpx';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
