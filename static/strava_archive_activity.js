@@ -281,6 +281,29 @@
     const pwr  = hasPwr  ? buildSeries("pwr",  "power",       "#FFB300", true,  false) : { svg: "" };
     const cad  = hasCad  ? buildSeries("cad",  "cadence",     "#4caf50", true,  false) : { svg: "" };
 
+    // Horizontal HR-zone threshold lines, sharing the HR series' y-scale.
+    // Each line is colored as the zone it crosses INTO, so the user reads
+    // "above this dashed orange line = Z4". Tagged .series-hr so the HR
+    // checkbox toggles them along with the curve.
+    let hrZoneSvg = "";
+    if (hasHr && hr.min != null && hr.max != null) {
+      const maxHr = state.settings.max_hr;
+      const yFor = bpm => PAD + innerH - ((bpm - hr.min) / (hr.max - hr.min)) * innerH;
+      for (let z = 1; z < HR_ZONES.length; z++) {
+        const bpm = maxHr * HR_ZONES[z].min;
+        if (bpm < hr.min || bpm > hr.max) continue;
+        const y = yFor(bpm);
+        hrZoneSvg += `<line class="series series-hr hr-zone-threshold" `
+                  +  `x1="${PAD}" x2="${W - PAD}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" `
+                  +  `stroke="${HR_ZONES[z].color}" stroke-width="0.7" stroke-dasharray="4,4" `
+                  +  `opacity="0.55" pointer-events="none"/>`
+                  +  `<text class="series series-hr hr-zone-label" `
+                  +  `x="${(W - PAD - 2).toFixed(1)}" y="${(y - 2).toFixed(1)}" `
+                  +  `fill="${HR_ZONES[z].color}" font-size="9" text-anchor="end" `
+                  +  `opacity="0.75" pointer-events="none">${HR_ZONES[z].name.split(" ")[0]} · ${Math.round(bpm)}</text>`;
+      }
+    }
+
     const svg = $("elev-chart");
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     // Order: elevation (with area) at bottom, then thin metric lines on top, cursor topmost
@@ -288,6 +311,7 @@
       ${elev.svg}
       ${pwr.svg}
       ${cad.svg}
+      ${hrZoneSvg}
       ${hr.svg}
       <line id="elev-cursor-line" y1="${PAD}" y2="${H - PAD}"
             stroke="#FFEB3B" stroke-width="1.5" stroke-dasharray="3,3"
@@ -797,6 +821,13 @@
       if (!r.ok) { alert(j.error || `Update failed (${r.status})`); return; }
       state.settings = { ...state.settings, ...j };
       renderHrZones();
+      // Threshold lines on the elevation chart live in HR's y-scale and depend
+      // on max_hr; rebuild the chart so they shift to the new bpm values.
+      const pts = state.data && state.data.points;
+      if (pts && pts.length) {
+        renderElevation(pts);
+        setCursor(state.cursorIdx);
+      }
     } catch (err) {
       alert(`Update failed: ${err.message || err}`);
     }

@@ -113,10 +113,53 @@ def init():
         run_local_extras_backfill(conn)
         run_max_hr_backfill(conn)
         run_avg_hr_cleanup(conn)
+        run_elevation_cleanup(conn)
         conn.execute(LOCATION_UPDATE_SQL)
         run_geo_classification(conn)
     finally:
         conn.close()
+
+
+def run_elevation_cleanup(conn):
+    """Wipe sentinel "no fix" elevation values (typically ~9.99e24 from the
+    first few points before GPS lock) and recompute the affected activities'
+    elevation summary stats from the surviving real readings. Idempotent —
+    a no-op when no track_points row is outside the sane range."""
+    affected = [r[0] for r in conn.execute(
+        "SELECT DISTINCT activity_id FROM track_points "
+        "WHERE elevation_m IS NOT NULL "
+        "  AND (elevation_m > 9000 OR elevation_m < -500)"
+    )]
+    if not affected:
+        return
+    conn.execute(
+        "UPDATE track_points SET elevation_m=NULL "
+        " WHERE elevation_m IS NOT NULL "
+        "   AND (elevation_m > 9000 OR elevation_m < -500)"
+    )
+    for aid in affected:
+        elevs = [r[0] for r in conn.execute(
+            "SELECT elevation_m FROM track_points "
+            " WHERE activity_id=? AND elevation_m IS NOT NULL "
+            " ORDER BY sequence", (aid,)
+        )]
+        if not elevs:
+            conn.execute(
+                "UPDATE activities SET elevation_low_m=NULL, elevation_high_m=NULL, "
+                "       elevation_gain_m=NULL, elevation_loss_m=NULL WHERE id=?",
+                (aid,),
+            )
+            continue
+        gain = loss = 0.0
+        for i in range(1, len(elevs)):
+            d = elevs[i] - elevs[i - 1]
+            if d > 0: gain += d
+            else:     loss += -d
+        conn.execute(
+            "UPDATE activities SET elevation_low_m=?, elevation_high_m=?, "
+            "       elevation_gain_m=?, elevation_loss_m=? WHERE id=?",
+            (min(elevs), max(elevs), gain, loss, aid),
+        )
 
 
 def run_local_extras_backfill(conn):

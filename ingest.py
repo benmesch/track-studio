@@ -227,6 +227,26 @@ def _link_local_to_strava(conn, strava_id, strava_start_time, strava_type):
 
 # ───────────────────────────── GPX/FIT → points ─────────────────────────────
 
+# Some devices emit ~9.999999E+24 for "no fix" elevation samples (typically
+# the first point or two before GPS lock). Anything outside this range is a
+# sentinel, not a real reading; treat it as missing. Ranges chosen to keep
+# room for Everest summits and Dead Sea — no current activity is plausibly
+# outside [-500, 9000] m.
+_ELEV_MIN_VALID_M = -500.0
+_ELEV_MAX_VALID_M = 9000.0
+
+
+def _sane_elev(v):
+    if v is None:
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    if not (_ELEV_MIN_VALID_M <= f <= _ELEV_MAX_VALID_M):
+        return None
+    return f
+
 
 def _open_track_file(zip_file, member):
     with zip_file.open(member) as fh:
@@ -316,7 +336,7 @@ def _parse_gpx_points(data):
                     "time":          p.time.isoformat() if p.time else None,
                     "lat":           p.latitude,
                     "lon":           p.longitude,
-                    "elevation_m":   p.elevation,
+                    "elevation_m":   _sane_elev(p.elevation),
                     "hr":            _f({"hr"},               int),
                     "cadence":       _f({"cad", "cadence"},   int),
                     "power":         _f({"power", "watts"},   int),
@@ -371,7 +391,7 @@ def _parse_fit_points(data):
                 "time":          ts.isoformat() if hasattr(ts, "isoformat") else None,
                 "lat":           _semi_to_deg(g("position_lat")),
                 "lon":           _semi_to_deg(g("position_long")),
-                "elevation_m":   g("enhanced_altitude") if g("enhanced_altitude") is not None else g("altitude"),
+                "elevation_m":   _sane_elev(g("enhanced_altitude") if g("enhanced_altitude") is not None else g("altitude")),
                 "hr":            g("heart_rate"),
                 "cadence":       g("cadence"),
                 "power":         g("power"),
