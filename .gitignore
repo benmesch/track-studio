@@ -10,3 +10,4 @@ archives/
 *.db-journal
 *.db-wal
 *.db-shm
+app_settings.json

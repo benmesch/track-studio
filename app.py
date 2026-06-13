@@ -9,6 +9,7 @@ from flask import Flask, Response, abort, jsonify, render_template, request
 from werkzeug.routing import BaseConverter
 
 import db
+import settings as app_settings
 from gpx_writer import gpx_filename, write_gpx
 from ingest import STATE, run_ingest
 from local_upload import save_local_activity
@@ -149,6 +150,27 @@ def strava_upload():
     thread.start()
 
     return jsonify({"ok": True, "zip_path": str(dest)}), 202
+
+
+@app.get("/api/settings")
+def get_settings():
+    return jsonify(app_settings.load())
+
+
+@app.patch("/api/settings")
+def patch_settings():
+    """Persist a partial settings update. Unknown keys ignored; numeric keys
+    range-checked so a typo can't poison downstream zone math."""
+    body = request.get_json(silent=True) or {}
+    if "max_hr" in body:
+        try:
+            mh = int(body["max_hr"])
+        except (ValueError, TypeError):
+            return jsonify({"error": "max_hr must be a whole number"}), 400
+        if not 100 <= mh <= 250:
+            return jsonify({"error": "max_hr must be between 100 and 250"}), 400
+        body["max_hr"] = mh
+    return jsonify(app_settings.save(body))
 
 
 @app.get("/api/strava/status")

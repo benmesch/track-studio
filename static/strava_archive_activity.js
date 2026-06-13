@@ -43,7 +43,22 @@
     pointSpeedsMps: [],        // per-point smoothed speed (m/s)
     totalDistM: 0,
     elevPlot:   null,          // { PAD, W, H, innerW, innerH, minE, maxE, totalDist }
+    settings:   { max_hr: 190 },
   };
+
+  // ───────────────── HR zones ─────────────────
+  // Standard 5-zone model expressed as fractions of max HR. min is inclusive,
+  // max is exclusive; the last zone catches >= 0.9 (and over-max).
+  const HR_ZONES = [
+    { name: "Z1 Recovery",  min: 0.00, max: 0.60, color: "#5a9bd4" },
+    { name: "Z2 Endurance", min: 0.60, max: 0.70, color: "#7cb342" },
+    { name: "Z3 Tempo",     min: 0.70, max: 0.80, color: "#fdd835" },
+    { name: "Z4 Threshold", min: 0.80, max: 0.90, color: "#fb8c00" },
+    { name: "Z5 Anaerobic", min: 0.90, max: Infinity, color: "#e53935" },
+  ];
+  // Cap the per-segment duration we count; auto-pause and lost-signal gaps
+  // can produce 5-minute "samples" that would otherwise dominate the chart.
+  const HR_ZONE_GAP_CAP_S = 30;
 
   // ───────────────── Formatters ─────────────────
 
@@ -694,11 +709,106 @@
     });
   }
 
+  function computeHrZoneSeconds(points, maxHr) {
+    const buckets = HR_ZONES.map(() => 0);
+    let total = 0;
+    if (!points || points.length < 2 || !maxHr) return { buckets, total };
+    for (let i = 1; i < points.length; i++) {
+      const p1 = points[i - 1];
+      const p2 = points[i];
+      if (!p1.time || !p2.time)         continue;
+      if (p1.hr == null || p1.hr <= 0)  continue;
+      const dt = (new Date(p2.time) - new Date(p1.time)) / 1000;
+      if (!(dt > 0) || dt > HR_ZONE_GAP_CAP_S) continue;
+      const frac = p1.hr / maxHr;
+      const zi = HR_ZONES.findIndex(z => frac < z.max);
+      const bucket = zi === -1 ? HR_ZONES.length - 1 : zi;
+      buckets[bucket] += dt;
+      total += dt;
+    }
+    return { buckets, total };
+  }
+
+  function renderHrZones() {
+    const points = state.data && state.data.points;
+    const maxHr  = state.settings.max_hr;
+    const section = $("hr-zones-section");
+    if (!points || !points.some(p => p.hr != null && p.hr > 0)) {
+      section.hidden = true;
+      return;
+    }
+    section.hidden = false;
+    $("hr-max-display").textContent = maxHr;
+
+    const { buckets, total } = computeHrZoneSeconds(points, maxHr);
+    if (total <= 0) {
+      $("hr-zones-bar").innerHTML = "";
+      $("hr-zones-table").innerHTML = "";
+      return;
+    }
+
+    $("hr-zones-bar").innerHTML = HR_ZONES.map((z, i) => {
+      const pct = buckets[i] / total * 100;
+      if (pct <= 0) return "";
+      return `<div class="hr-zones-bar-seg" style="flex: ${pct} 0 0; background:${z.color}" title="${esc(z.name)} — ${fmtTime(buckets[i])} (${pct.toFixed(1)}%)"></div>`;
+    }).join("");
+
+    const rangeBpm = (z) => {
+      const lo = Math.round(maxHr * z.min);
+      const hi = z.max === Infinity ? `${Math.round(maxHr * 0.9)}+` : Math.round(maxHr * z.max) - 1;
+      return `${lo}–${hi} bpm`;
+    };
+
+    $("hr-zones-table").innerHTML = HR_ZONES.map((z, i) => {
+      const pct = total > 0 ? buckets[i] / total * 100 : 0;
+      return `<div class="hr-zones-row">
+        <span class="hr-zones-cell-label"><span class="hr-zones-dot" style="background:${z.color}"></span>${esc(z.name)}</span>
+        <span class="hr-zones-cell-range">${rangeBpm(z)}</span>
+        <span class="hr-zones-cell-time">${fmtTime(buckets[i])}</span>
+        <span class="hr-zones-cell-pct">${pct.toFixed(1)}%</span>
+      </div>`;
+    }).join("");
+  }
+
+  async function loadSettings() {
+    try {
+      const r = await fetch("/api/settings");
+      if (r.ok) state.settings = { ...state.settings, ...await r.json() };
+    } catch { /* defaults are fine */ }
+  }
+
+  async function editMaxHr() {
+    const current = state.settings.max_hr;
+    const input = window.prompt("Max heart rate (bpm, 100–250):", String(current));
+    if (input == null) return;
+    const val = parseInt(input.trim(), 10);
+    if (!Number.isFinite(val) || val < 100 || val > 250) {
+      alert("Please enter a whole number between 100 and 250.");
+      return;
+    }
+    if (val === current) return;
+    try {
+      const r = await fetch("/api/settings", {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ max_hr: val }),
+      });
+      const j = await r.json();
+      if (!r.ok) { alert(j.error || `Update failed (${r.status})`); return; }
+      state.settings = { ...state.settings, ...j };
+      renderHrZones();
+    } catch (err) {
+      alert(`Update failed: ${err.message || err}`);
+    }
+  }
+
   // ───────────────── Init ─────────────────
 
   async function init() {
     setupUnitToggle();
     setupSeriesToggles();
+    $("hr-max-edit")?.addEventListener("click", editMaxHr);
+    await loadSettings();
     try {
       const resp = await fetch(`/api/strava/activities/${ID}`);
       if (resp.status === 404) {
@@ -714,6 +824,7 @@
 
       renderHeader(data.activity);
       renderStats(data.activity);
+      renderHrZones();
 
       const points = data.points || [];
       if (points.length === 0) {
