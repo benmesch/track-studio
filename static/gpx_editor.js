@@ -583,9 +583,15 @@ hrClearBtn.addEventListener('click', () => {
 });
 
 // Inject <gpxtpx:hr> into a trkpt, creating the extension wrappers as needed.
+// The extensions element must be in the GPX namespace — plain createElement()
+// produces a null-namespace element that browsers serialize as
+// xmlns="http://www.w3.org/1999/xhtml", and gpxpy ignores anything not in the
+// GPX namespace, so HR silently never makes it into the server-side parse.
+const GPX_NS = 'http://www.topografix.com/GPX/1/1';
 function setTrkptHr(doc, trkpt, hr) {
-  let ext = trkpt.getElementsByTagName('extensions')[0];
-  if (!ext) { ext = doc.createElement('extensions'); trkpt.appendChild(ext); }
+  let ext = trkpt.getElementsByTagNameNS(GPX_NS, 'extensions')[0]
+         || trkpt.getElementsByTagName('extensions')[0];
+  if (!ext) { ext = doc.createElementNS(GPX_NS, 'extensions'); trkpt.appendChild(ext); }
   let tpe = ext.getElementsByTagNameNS(GPXTPX_NS, 'TrackPointExtension')[0]
          || ext.getElementsByTagName('gpxtpx:TrackPointExtension')[0];
   if (!tpe) { tpe = doc.createElementNS(GPXTPX_NS, 'gpxtpx:TrackPointExtension'); ext.appendChild(tpe); }

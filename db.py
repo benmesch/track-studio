@@ -110,12 +110,54 @@ def init():
         _ensure_column(conn, "activities", "replaced_by_id",     "INTEGER")
         _ensure_column(conn, "activities", "replaced_at",        "TEXT")
         run_hr_cleanup(conn)
+        run_local_extras_backfill(conn)
         run_max_hr_backfill(conn)
         run_avg_hr_cleanup(conn)
         conn.execute(LOCATION_UPDATE_SQL)
         run_geo_classification(conn)
     finally:
         conn.close()
+
+
+def run_local_extras_backfill(conn):
+    """Self-heal HR / cadence / power / atemp for source='local' activities
+    saved with a buggy editor that wrote <extensions> in the wrong namespace.
+    Idempotent: only touches rows where avg_hr is NULL and the on-disk GPX
+    has recoverable HR data."""
+    rows = conn.execute(
+        "SELECT id, original_file_path FROM activities "
+        " WHERE source='local' AND avg_hr IS NULL "
+        "   AND original_file_path IS NOT NULL"
+    ).fetchall()
+    if not rows:
+        return
+    from ingest import _scan_trkpt_extras_blind
+    for row in rows:
+        try:
+            with open(row["original_file_path"], "rb") as f:
+                data = f.read()
+        except OSError:
+            continue
+        extras = _scan_trkpt_extras_blind(data)
+        hrs = [e["hr"] for e in extras if e.get("hr")]
+        if not hrs:
+            continue
+        for seq, e in enumerate(extras):
+            if any(e.get(k) is not None for k in ("hr", "cadence", "power", "temperature_c")):
+                conn.execute(
+                    "UPDATE track_points "
+                    "   SET hr            = COALESCE(?, hr), "
+                    "       cadence       = COALESCE(?, cadence), "
+                    "       power         = COALESCE(?, power), "
+                    "       temperature_c = COALESCE(?, temperature_c) "
+                    " WHERE activity_id=? AND sequence=?",
+                    (e.get("hr"), e.get("cadence"), e.get("power"),
+                     e.get("temperature_c"), row["id"], seq),
+                )
+        conn.execute(
+            "UPDATE activities SET avg_hr=?, max_hr=? WHERE id=?",
+            (sum(hrs) / len(hrs), max(hrs), row["id"]),
+        )
 
 
 # Activities whose HR sensor was malfunctioning — readings drift continuously

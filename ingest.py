@@ -257,9 +257,49 @@ def _gpx_ext_value(point, tag_names):
     return None
 
 
+_GPX_TRKPT_TAG = "{http://www.topografix.com/GPX/1/1}trkpt"
+_EXTRA_FIELDS = (
+    ("hr",            {"hr"},               int,   "hr"),
+    ("cadence",       {"cad", "cadence"},   int,   "cadence"),
+    ("power",         {"power", "watts"},   int,   "power"),
+    ("temperature_c", {"atemp", "temp"},    float, "temperature_c"),
+)
+
+
+def _scan_trkpt_extras_blind(data):
+    """Walk the raw GPX XML and pull HR / cadence / power / atemp values out of
+    each <trkpt> regardless of which namespace the surrounding <extensions>
+    block lives in. Returns a list aligned with trkpt document order.
+
+    gpxpy ignores <extensions> blocks that aren't in the GPX namespace, which
+    silently drops HR injected by the in-app GPX Editor (browsers emit
+    xmlns="http://www.w3.org/1999/xhtml" on null-namespace elements). This
+    fallback covers that — and any other tool that writes misnamespaced
+    extensions — without changing the gpxpy-driven fast path.
+    """
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(data)
+    except ET.ParseError:
+        return []
+    out = []
+    for tp in root.iter(_GPX_TRKPT_TAG):
+        extras = {dest: None for _, _, _, dest in _EXTRA_FIELDS}
+        for elem in tp.iter():
+            tag = elem.tag.rsplit("}", 1)[-1].lower() if isinstance(elem.tag, str) else ""
+            for _, tags, cast, dest in _EXTRA_FIELDS:
+                if tag in tags and extras[dest] is None and elem.text:
+                    try:
+                        extras[dest] = cast(float(elem.text.strip()))
+                    except (ValueError, TypeError):
+                        pass
+        out.append(extras)
+    return out
+
+
 def _parse_gpx_points(data):
     gpx = gpxpy.parse(data.decode("utf-8", errors="replace"))
-    seq = 0
+    points = []
     for track in gpx.tracks:
         for segment in track.segments:
             for p in segment.points:
@@ -271,8 +311,8 @@ def _parse_gpx_points(data):
                         return cast(float(raw))
                     except (ValueError, TypeError):
                         return None
-                yield {
-                    "sequence":      seq,
+                points.append({
+                    "sequence":      len(points),
                     "time":          p.time.isoformat() if p.time else None,
                     "lat":           p.latitude,
                     "lon":           p.longitude,
@@ -281,8 +321,19 @@ def _parse_gpx_points(data):
                     "cadence":       _f({"cad", "cadence"},   int),
                     "power":         _f({"power", "watts"},   int),
                     "temperature_c": _f({"atemp", "temp"},    float),
-                }
-                seq += 1
+                })
+
+    if any(pt.get(k) is None for pt in points for _, _, _, k in _EXTRA_FIELDS):
+        blind = _scan_trkpt_extras_blind(data)
+        for i, pt in enumerate(points):
+            if i >= len(blind):
+                break
+            for _, _, _, dest in _EXTRA_FIELDS:
+                if pt.get(dest) is None and blind[i].get(dest) is not None:
+                    pt[dest] = blind[i][dest]
+
+    for pt in points:
+        yield pt
 
 
 def _semi_to_deg(v):
