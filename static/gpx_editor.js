@@ -10,6 +10,7 @@ let removedSet = new Set();   // indices marked for spot removal
 let cursorIdx = 0;
 let units = localStorage.getItem('gpx-units') || 'metric';  // 'metric' | 'imperial'
 let hrLoaded = false;         // true once HR from a .fit has been merged in
+let lastFitData = null;       // cache last parsed .fit response so checkbox toggles can re-merge without re-picking the file
 
 // Garmin TrackPointExtension namespace — how GPX carries per-point HR.
 const GPXTPX_NS = 'http://www.garmin.com/xmlschemas/TrackPointExtension/v1';
@@ -144,6 +145,7 @@ function loadGpxText(text, filename) {
       lon: parseFloat(pt.getAttribute('lon')),
       time: isNaN(t) ? null : t,
       ele:  isNaN(e) ? null : e,
+      hr_original: readTrkptHr(pt),  // for status accounting + fill-gaps mode
     };
   });
 
@@ -494,8 +496,21 @@ map.on('click', e => {
 });
 
 // ── Heart-rate merge (from a separate .fit file) ──────────────────────────────
+
+// Pull HR from a trkpt regardless of which namespace its <extensions> uses.
+// '*' matches any namespace, so xhtml / gpxtpx / null-ns all resolve.
+function readTrkptHr(trkpt) {
+  const hrEls = trkpt.getElementsByTagNameNS('*', 'hr');
+  for (const el of hrEls) {
+    const v = parseInt(el.textContent, 10);
+    if (Number.isFinite(v) && v > 0) return v;
+  }
+  return null;
+}
+
 function resetHr() {
   hrLoaded = false;
+  lastFitData = null;
   allPoints.forEach(p => { p.hr = null; });
   if (fitInput) fitInput.value = '';
   if (hrStatusEl) { hrStatusEl.hidden = true; hrStatusEl.textContent = ''; hrStatusEl.className = 'hr-status'; }
@@ -504,12 +519,20 @@ function resetHr() {
 
 // Match each GPX point to the nearest FIT HR sample (within tolerance) by time.
 // Both arrays are time-ascending; we binary-search per point for clarity.
-function mergeHrSamples(samples) {
+// When fillGapsOnly is true, leave points that already had HR in the source
+// GPX untouched (p.hr stays null → setTrkptHr is skipped → original preserved).
+// Returns { newHr, preserved, totalCovered } counts for the status line.
+function mergeHrSamples(samples, fillGapsOnly) {
   const times = samples.map(s => s.t);
-  let matched = 0;
+  let newHr = 0, preserved = 0;
   for (const p of allPoints) {
     p.hr = null;
-    if (p.time == null || times.length === 0) continue;
+    const hadOriginal = p.hr_original != null;
+    if (fillGapsOnly && hadOriginal) { preserved++; continue; }
+    if (p.time == null || times.length === 0) {
+      if (hadOriginal) preserved++;
+      continue;
+    }
     let lo = 0, hi = times.length - 1;
     while (lo < hi) {
       const mid = (lo + hi) >> 1;
@@ -520,9 +543,14 @@ function mergeHrSamples(samples) {
       const d = Math.abs(times[lo - 1] - p.time);
       if (d < bestD) { best = lo - 1; bestD = d; }
     }
-    if (bestD <= HR_MATCH_TOLERANCE_MS) { p.hr = samples[best].hr; matched++; }
+    if (bestD <= HR_MATCH_TOLERANCE_MS) {
+      p.hr = samples[best].hr;
+      newHr++;
+    } else if (hadOriginal) {
+      preserved++;
+    }
   }
-  return matched;
+  return { newHr, preserved, totalCovered: newHr + preserved };
 }
 
 function showHrStatus(msg, kind) {
@@ -554,8 +582,15 @@ async function loadFitFile(file) {
     return;
   }
 
-  const matched = mergeHrSamples(data.samples);
-  if (matched === 0) {
+  lastFitData = data;
+  applyFitMerge();
+}
+
+function applyFitMerge() {
+  if (!lastFitData) return;
+  const fillGapsOnly = document.getElementById('hr-fill-gaps')?.checked || false;
+  const { newHr, preserved, totalCovered } = mergeHrSamples(lastFitData.samples, fillGapsOnly);
+  if (newHr === 0 && preserved === 0) {
     hrLoaded = false;
     showHrStatus(
       `No points matched. The .fit and GPX timestamps don't overlap — ` +
@@ -563,14 +598,22 @@ async function loadFitFile(file) {
     hrClearBtn.hidden = true;
   } else {
     hrLoaded = true;
-    const pct = Math.round(matched / allPoints.length * 100);
+    const total = allPoints.length;
+    const pct = Math.round(totalCovered / total * 100);
+    const parts = [];
+    if (newHr)     parts.push(`${newHr.toLocaleString()} new`);
+    if (preserved) parts.push(`${preserved.toLocaleString()} kept`);
     showHrStatus(
-      `Merged HR into ${matched.toLocaleString()} / ${allPoints.length.toLocaleString()} ` +
-      `points (${pct}%) · ${data.hr_min}–${data.hr_max} bpm`, 'ok');
+      `HR on ${totalCovered.toLocaleString()} / ${total.toLocaleString()} points (${pct}%) ` +
+      `— ${parts.join(', ')} · ${lastFitData.hr_min}–${lastFitData.hr_max} bpm`,
+      newHr === 0 ? 'warn' : 'ok',
+    );
     hrClearBtn.hidden = false;
   }
   updateDisplay();
 }
+
+document.getElementById('hr-fill-gaps')?.addEventListener('change', applyFitMerge);
 
 fitInput.addEventListener('change', e => {
   const file = e.target.files[0];

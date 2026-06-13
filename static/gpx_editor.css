@@ -296,7 +296,20 @@ input[type="range"] {
 }
 .hr-status[hidden] { display: none; }
 .hr-status.ok    { color: #81c784; background: #233a2a; }
+.hr-status.warn  { color: #ffd54f; background: #3a3120; }
 .hr-status.error { color: #ef9a9a; background: #3a2323; }
+
+.hr-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #bbb;
+  margin: 6px 0 4px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.hr-checkbox input { accent-color: #2196F3; cursor: pointer; }
 
 .hr-section .btn-action.clear { margin-top: 8px; width: 100%; }
 

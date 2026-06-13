@@ -138,6 +138,10 @@
         </button>
         <div class="section-content">
           <div class="hint">Add HR from a matching <code>.fit</code> file (same activity). Points are matched by timestamp.</div>
+          <label class="hr-checkbox">
+            <input type="checkbox" id="hr-fill-gaps" checked>
+            <span>Only fill gaps — keep existing GPX HR where present</span>
+          </label>
           <label for="fit-input">Load .fit file</label>
           <input type="file" id="fit-input" accept=".fit">
           <div class="hr-status" id="hr-status" hidden></div>
