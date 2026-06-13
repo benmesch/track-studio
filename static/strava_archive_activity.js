@@ -612,9 +612,7 @@
     }
 
     if (a.has_points) {
-      const dl = $("download-gpx");
-      dl.href   = `/api/strava/activities/${a.id}/gpx`;
-      dl.hidden = false;
+      $("download-gpx").hidden = false;
     }
 
     if (a.source === "local") {
@@ -835,10 +833,44 @@
 
   // ───────────────── Init ─────────────────
 
+  // Download via fetch+blob so the browser doesn't navigate away — a plain
+  // <a href> would trigger a system "Open or Download?" prompt on iOS that
+  // leaves the user on a blank URL with no obvious way back.
+  async function downloadGpx() {
+    const a = state.data && state.data.activity;
+    if (!a) return;
+    const btn = $("download-gpx");
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "↓ …";
+    try {
+      const r = await fetch(`/api/strava/activities/${a.id}/gpx`);
+      if (!r.ok) { alert(`Download failed (${r.status})`); return; }
+      const cd = r.headers.get("Content-Disposition") || "";
+      const m = cd.match(/filename="([^"]+)"/);
+      const filename = m ? m[1] : `activity-${a.id}.gpx`;
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(`Download failed: ${err.message || err}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
+  }
+
   async function init() {
     setupUnitToggle();
     setupSeriesToggles();
     $("hr-max-edit")?.addEventListener("click", editMaxHr);
+    $("download-gpx")?.addEventListener("click", downloadGpx);
     await loadSettings();
     try {
       const resp = await fetch(`/api/strava/activities/${ID}`);
